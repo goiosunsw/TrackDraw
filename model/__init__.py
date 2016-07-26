@@ -26,36 +26,27 @@ class Model:
 
         # Create the default formant tracks
         default_FFs = self.default_parms.FF
+        default_F0 = self.default_parms.F0
         track_npoints = self.default_parms.track_npoints
         ones = np.ones(track_npoints)
         self.tracks = [Track(formant*ones) for formant in default_FFs]
+        self.f0_track = Track(default_F0*ones)
 
         # Define the two sounds: load and synth
         resample_fs = self.default_parms.resample_fs
         synth_fs = self.default_parms.synth_fs
         self.loaded_sound = Sound(np.array([]), resample_fs, 1)
         self.synth_sound  = Sound(np.array([]), synth_fs, 1)
-        
-    def updateTrackClick(self, x_loc, y_loc, x_high):
-        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
-        nearest_x_idx = dist_to_x_pts.argmin()
-        y_coords_at_nearest_x = np.array(\
-                [track.points[nearest_x_idx] for track in self.tracks])
-        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
-        trackNo = dist_to_y_pts.argmin()
-        self.tracks[trackNo].points[nearest_x_idx] = y_loc
-        return trackNo, self.tracks[trackNo].points
-        
-    def updateTrackDrag(self, x_loc, y_loc, trackNo, x_high):
-        dist_to_x_pts = np.abs(np.arange(0,x_high,x_high/40) - x_loc)
-        nearest_x_idx = dist_to_x_pts.argmin()
-        self.tracks[trackNo].points[nearest_x_idx] = y_loc
-        return trackNo, self.tracks[trackNo].points
 
     def getTracks(self):
         output = np.zeros([40, len(self.tracks)])
         for i in range(len(self.tracks)):
             output[0:40, i] = self.tracks[i].points
+        return(output)
+        
+    def getF0Track(self):
+        output = np.zeros([40])
+        output[:] = self.f0_track.points
         return(output)
 
 class Sound:
