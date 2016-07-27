@@ -43,7 +43,7 @@ class Parameters:
     Helpful docstring
     """
     def __init__(self, F0=100,
-                       FF=[800, 1600, 2400, 3200, 4000],
+                       FF=[500, 1500, 2500, 3500, 4500],
                        BW=np.array([50, 100, 100, 200, 250]),
                        resample_fs=10000,
                        synth_fs=10000,
@@ -78,6 +78,6 @@ SYNTH_SOUND  = Sound(np.zeros([1, 10000]), DEFAULT_PARAMS.resample_fs, 1)
 npoints = DEFAULT_PARAMS.track_npoints
 F0 = DEFAULT_PARAMS.F0
 allFF = DEFAULT_PARAMS.FF
-F0_TRACK =  Track(F0*np.ones([1, npoints]))
-TRACKS   = [Track(FF*np.ones([1, npoints])) for FF in allFF]
+F0_TRACK =  Track(F0*np.ones([npoints]))
+TRACKS   = [Track(FF*np.ones([npoints])) for FF in allFF]
 

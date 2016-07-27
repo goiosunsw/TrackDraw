@@ -31,14 +31,14 @@ class CanvasGrid(QWidget):
         mainGrid.setColumnStretch(0, 1)
         mainGrid.setColumnStretch(1, 7)
 
-        canvas1 = WaveCanvas(self)
-        canvas2 = STFTCanvas(self)
-        canvas3 = SpecCanvas(self)
-        canvas4 = F0Canvas(self)
-        mainGrid.addWidget(canvas1, 0, 1)
-        mainGrid.addWidget(canvas2, 1, 0)
-        mainGrid.addWidget(canvas3, 1, 1)
-        mainGrid.addWidget(canvas4, 2, 1)
+        self.canvas1 = WaveCanvas(self)
+        self.canvas2 = STFTCanvas(self)
+        self.canvas3 = SpecCanvas(self)
+        self.canvas4 = F0Canvas(self)
+        mainGrid.addWidget(self.canvas1, 0, 1)
+        mainGrid.addWidget(self.canvas2, 1, 0)
+        mainGrid.addWidget(self.canvas3, 1, 1)
+        mainGrid.addWidget(self.canvas4, 2, 1)
 
 
 class WaveCanvas(FigureCanvas):
@@ -74,6 +74,41 @@ class SpecCanvas(FigureCanvas):
         self.fig.subplots_adjust(left=0.08, top=0.95, right=0.95, bottom=0.1)
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
+        
+        click = partial(TDS.mouse, wasClick=True, plot=self, target="FF")
+        drag = partial(TDS.mouse, wasClick=False, plot=self, target="FF")
+        self.fig.canvas.mpl_connect('button_press_event', click)
+        self.fig.canvas.mpl_connect('motion_notify_event', drag)
+        
+        self.tracks = []
+        self.background = None
+        self.n_form = 5
+        self.locked_track = 0
+        
+    def start(self):
+        self.ax.clear()
+        self.ax.set_xlim(0, 39)
+        self.ax.set_ylim(0, 5000)
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        for i in range(self.n_form):
+            self.tracks.append(self.ax.plot([i*1000+500]*40, color="blue", marker="o"))
+        self.ax.set_xlim(0, 39)
+        self.ax.set_ylim(0, 5000)
+        
+    def mouse(self, event):
+        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
+        xmin, xmax = self.ax.get_xlim()
+        ymin, ymax = self.ax.get_ylim()
+        if xmin < x_loc < xmax and ymin < y_loc < ymax:
+            return(x_loc, y_loc)
+        
+    def update_track(self, new_track, trackNo):
+        self.fig.canvas.restore_region(self.background)
+        self.tracks[trackNo][0].set_ydata(new_track)
+        for i in range(self.n_form):
+            self.ax.draw_artist(self.tracks[i][0])
+        self.fig.canvas.blit(self.ax.clipbox)
 
 
 class F0Canvas(FigureCanvas):
@@ -85,7 +120,39 @@ class F0Canvas(FigureCanvas):
         self.fig.subplots_adjust(left=0.08, right=0.95) 
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
-
+        
+        click = partial(TDS.mouse, wasClick=True, plot=self, target="F0")
+        drag = partial(TDS.mouse, wasClick=False, plot=self, target="F0")
+        self.fig.canvas.mpl_connect('button_press_event', click)
+        self.fig.canvas.mpl_connect('motion_notify_event', drag)
+        
+        self.f0_track = None
+        self.background = None
+        
+    def start(self):
+        self.ax.clear()
+        self.ax.set_xlim(0, 39)
+        self.ax.set_ylim(90, 150)
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        self.f0_track = self.ax.plot([100]*40, color="blue", marker="o")
+        self.ax.set_xlim(0, 39)
+        self.ax.set_ylim(90, 150)
+        
+    def mouse(self, event):
+        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
+        xmin, xmax = self.ax.get_xlim()
+        ymin, ymax = self.ax.get_ylim()
+        if xmin < x_loc < xmax and ymin < y_loc < ymax:
+            return(x_loc, y_loc)
+        
+    def update_track(self, new_track):
+        self.fig.canvas.restore_region(self.background)
+        self.f0_track[0].set_ydata(new_track)
+        self.ax.draw_artist(self.f0_track[0])
+        self.fig.canvas.blit(self.ax.clipbox)
+        
+        
 class DisplayDock(QDockWidget):
     def __init__(self, parent=None):
         super(DisplayDock, self).__init__(parent)

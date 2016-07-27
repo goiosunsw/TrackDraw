@@ -17,7 +17,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
-        self.setCentralWidget(TDW.CanvasGrid(self))
+        self.cw = TDW.CanvasGrid(self)
+        self.setCentralWidget(self.cw)
 
         ##### Menus #####
         # Partial function application to create appropriate callbacks
@@ -115,6 +116,11 @@ def main():
     app.setApplicationName("TrackDraw")
     mainWindow = MainWindow()
     mainWindow.show()
+    # Have to initialize canvasses here, otherwise they're the wrong size!!
+    # We may want to consider renaming them to something easier to use,
+    # but I'm not sure where they're referenced... DG 07/26
+    mainWindow.cw.canvas3.start()
+    mainWindow.cw.canvas4.start()
     app.exec_()
 
 

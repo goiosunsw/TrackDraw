@@ -56,12 +56,37 @@ def applyAnalysis(*arg, parent=None, **kwarg):
 
 @pyqtSlot()
 def synthesize(*arg, parent=None, **kwarg):
-    print(0)
-
-
-def mvpoint(*arg, parent=None, **kwarg):
-    return 0
-
+    print("SYNTHESIZE!")
+    
+    
+@pyqtSlot()
+def mouse(*arg, parent=None, **kwarg):
+    event = list(arg)[0]
+    if event.button:
+        try:
+            plot = kwarg["plot"]
+            target = kwarg["target"]
+            wasClick = kwarg["wasClick"]
+            x_loc, y_loc = plot.mouse(event)
+            dist_to_x_pts = np.abs(np.linspace(0,39,40) - x_loc)
+            nearest_x_idx = dist_to_x_pts.argmin()
+            if target == "F0":
+                TDD.F0_TRACK.points[nearest_x_idx] = y_loc
+                plot.update_track(TDD.F0_TRACK.points)
+            elif target == "FF":
+                if wasClick == True:
+                    y_coords_at_nearest_x = np.array([track.points[nearest_x_idx] for track in TDD.TRACKS])
+                    dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
+                    trackNo = dist_to_y_pts.argmin()
+                    TDD.TRACKS[trackNo].points[nearest_x_idx] = y_loc
+                    plot.update_track(TDD.TRACKS[trackNo].points, trackNo)
+                    plot.locked_track = trackNo
+                elif wasClick == False:
+                    TDD.TRACKS[plot.locked_track].points[nearest_x_idx] = y_loc
+                    plot.update_track(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
+        except TypeError:
+            pass
+    
 
 def drawSpec(x):
     return 0
