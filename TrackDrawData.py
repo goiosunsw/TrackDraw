@@ -54,7 +54,8 @@ class Parameters:
                        inc_ms=5,
                        envelope=np.array([0, 1, 1, 1, 0]),
                        radiation=0,
-                       synthesis_type="Klatt 1980"):
+                       synthesis_type="Klatt 1980",
+                       n_form=5):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -68,12 +69,13 @@ class Parameters:
         self.envelope = envelope
         self.radiation = radiation
         self.synthesis_type = synthesis_type
+        self.n_form = n_form
 
 
 DEFAULT_PARAMS = Parameters()
 CURRENT_PARAMS = Parameters()
-LOADED_SOUND = Sound(np.zeros([1, 10000]), DEFAULT_PARAMS.resample_fs, 1)
-SYNTH_SOUND  = Sound(np.zeros([1, 10000]), DEFAULT_PARAMS.resample_fs, 1)
+LOADED_SOUND = Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
+SYNTH_SOUND  = Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
 
 npoints = DEFAULT_PARAMS.track_npoints
 F0 = DEFAULT_PARAMS.F0

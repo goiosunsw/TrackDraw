@@ -3,6 +3,7 @@
 
 import TrackDrawWidgets as TDW
 import TrackDrawSlots as TDS
+import TrackDrawData as TDD
 import sys
 from functools import partial
 from PyQt5.QtCore import *
@@ -19,15 +20,19 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__(parent)
         self.cw = TDW.CanvasGrid(self)
         self.setCentralWidget(self.cw)
+        slots = TDS.Slots(master=self)
 
         ##### Menus #####
         # Partial function application to create appropriate callbacks
-        audioOpen = partial(TDS.audioOpen, parent=self)
-        audioSave = partial(TDS.audioSave, parent=self)
-        helpAbout = partial(TDS.helpAbout, parent=self)
-        clearPlots = partial(TDS.clearPlots, parent=self)
-        applyAnalysis = partial(TDS.applyAnalysis, parent=self)
-        synthesize = partial(TDS.synthesize, parent=self)
+        audioOpen = partial(slots.audioOpen, parent=self)
+        audioSave = partial(slots.audioSave, parent=self)
+        helpAbout = partial(slots.helpAbout, parent=self)
+        clearPlots = partial(slots.clearPlots)
+        applyAnalysis = partial(slots.applyAnalysis)
+        synthesize = partial(slots.synthesize)
+        regrabPlots = partial(slots.regrabPlots)
+        switchPlots = partial(slots.switchPlots)
+        enableWave = partial(slots.enableWave)
         # File menu
         fileMenuActions = [\
                 self.createMenuAction("&Open a sound file...", 
@@ -65,21 +70,21 @@ class MainWindow(QMainWindow):
         ##### End menu setup #####
 
         ##### Docks on the right hand side #####
-        displayDock = TDW.DisplayDock(parent=self)
-        displayDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        displayDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
-        analysisDock = TDW.AnalysisDock(parent=self)
-        analysisDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        analysisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
-        synthesisDock = TDW.SynthesisDock(parent=self)
-        synthesisDock.setAllowedAreas(Qt.RightDockWidgetArea)
-        synthesisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.displayDock = TDW.DisplayDock(parent=self)
+        self.displayDock.setAllowedAreas(Qt.RightDockWidgetArea)
+        self.displayDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.analysisDock = TDW.AnalysisDock(parent=self)
+        self.analysisDock.setAllowedAreas(Qt.RightDockWidgetArea)
+        self.analysisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
+        self.synthesisDock = TDW.SynthesisDock(parent=self)
+        self.synthesisDock.setAllowedAreas(Qt.RightDockWidgetArea)
+        self.synthesisDock.setFeatures(QDockWidget.NoDockWidgetFeatures)
 
-        self.addDockWidget(Qt.RightDockWidgetArea, displayDock)
-        self.addDockWidget(Qt.RightDockWidgetArea, analysisDock)
-        self.addDockWidget(Qt.RightDockWidgetArea, synthesisDock)
-        self.tabifyDockWidget(displayDock, analysisDock)
-        self.tabifyDockWidget(analysisDock, synthesisDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.displayDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.analysisDock)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.synthesisDock)
+        self.tabifyDockWidget(self.displayDock, self.analysisDock)
+        self.tabifyDockWidget(self.analysisDock, self.synthesisDock)
 
         self.setTabPosition(Qt.RightDockWidgetArea, 3)
         ##### End dock setup #####
@@ -92,6 +97,32 @@ class MainWindow(QMainWindow):
         status.addPermanentWidget(self.sizeLabel)
         status.showMessage("Welcome to TrackDraw!", 5000)
         ##### End status bar setup #####
+        
+        ##### BUTTONS? #####
+        self.displayDock.regrabButton.clicked.connect(regrabPlots)
+        
+        self.synthesisDock.synthButton.clicked.connect(synthesize)
+        
+        self.displayDock.clearButton.clicked.connect(clearPlots)
+        
+        self.analysisDock.applyButton.clicked.connect(applyAnalysis)
+        
+        self.displayDock.synthedRadioButton.toggled.connect(switchPlots)
+        
+        self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
+        ##### END BUTTONS #####
+        
+        ##### Canvases setup #####
+        click_f0 = partial(slots.mouse, wasClick=True, plot=self.cw.f0_cv, target="F0")
+        drag_f0 = partial(slots.mouse, wasClick=False, plot=self.cw.f0_cv, target="F0")
+        self.cw.f0_cv.fig.canvas.mpl_connect('button_press_event', click_f0)
+        self.cw.f0_cv.fig.canvas.mpl_connect('motion_notify_event', drag_f0)
+        
+        click_ff = partial(slots.mouse, wasClick=True, plot=self.cw.spec_cv, target="FF")
+        drag_ff = partial(slots.mouse, wasClick=False, plot=self.cw.spec_cv, target="FF")
+        self.cw.spec_cv.fig.canvas.mpl_connect('button_press_event', click_ff)
+        self.cw.spec_cv.fig.canvas.mpl_connect('motion_notify_event', drag_ff)
+        ##### End canvases setup #####
 
     
     def createMenuAction(self, text, slot=None, shortcut=None, icon=None,
@@ -116,11 +147,11 @@ def main():
     app.setApplicationName("TrackDraw")
     mainWindow = MainWindow()
     mainWindow.show()
-    # Have to initialize canvasses here, otherwise they're the wrong size!!
+    # Have to start canvasses here, otherwise they're the wrong size!!
     # We may want to consider renaming them to something easier to use,
     # but I'm not sure where they're referenced... DG 07/26
-    mainWindow.cw.canvas3.start()
-    mainWindow.cw.canvas4.start()
+    mainWindow.cw.spec_cv.start(TDD.TRACKS)
+    mainWindow.cw.f0_cv.start(TDD.F0_TRACK)
     app.exec_()
 
 
