@@ -8,7 +8,7 @@ version: 0.1.0
 
 
 import numpy as np
-
+import matplotlib.mlab as mlab
 
 class Sound:
     """
@@ -16,8 +16,8 @@ class Sound:
     attribute changes. n_samples should never be changed individually.
     """
     def __init__(self, waveform, fs, nchannels):
-        self.waveform = waveform
         self.fs = fs
+        self.waveform = waveform
         self.nchannels = nchannels
 
     @property
@@ -28,6 +28,7 @@ class Sound:
     def waveform(self, val):
         self._waveform = val
         self.nsamples = len(self._waveform)
+        self.dur = self.nsamples/self.fs
 
 
 class Track:
@@ -50,11 +51,13 @@ class Parameters:
                        track_npoints=40,
                        voicing="Voicing",
                        window_len=256,
+                       window_type=np.hamming,
+                       noverlap=0.5,
                        dur=1,
                        inc_ms=5,
-                       envelope=np.array([0, 1, 1, 1, 0]),
+                       ENV=np.array([0, 1, 1, 1, 0]),
                        radiation=0,
-                       synthesis_type="Klatt 1980",
+                       synth_type="Klatt 1980",
                        n_form=5):
         self.F0 = F0
         self.FF = FF
@@ -64,11 +67,13 @@ class Parameters:
         self.track_npoints = track_npoints
         self.voicing = voicing
         self.window_len = window_len
+        self.window_type = window_type
+        self.noverlap = noverlap
         self.dur = dur
         self.inc_ms = inc_ms
-        self.envelope = envelope
+        self.ENV = ENV
         self.radiation = radiation
-        self.synthesis_type = synthesis_type
+        self.synth_type = synth_type
         self.n_form = n_form
 
 

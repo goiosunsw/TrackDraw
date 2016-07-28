@@ -22,17 +22,25 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.cw)
         slots = TDS.Slots(master=self)
 
-        ##### Menus #####
-        # Partial function application to create appropriate callbacks
+        ##### Callbacks #####
+        # Callbacks created using functools.partial, connected below
         audioOpen = partial(slots.audioOpen, parent=self)
         audioSave = partial(slots.audioSave, parent=self)
         helpAbout = partial(slots.helpAbout, parent=self)
         clearPlots = partial(slots.clearPlots)
         applyAnalysis = partial(slots.applyAnalysis)
         synthesize = partial(slots.synthesize)
-        regrabPlots = partial(slots.regrabPlots)
         switchPlots = partial(slots.switchPlots)
         enableWave = partial(slots.enableWave)
+        enableTracks = partial(slots.enableTracks)
+        changeWindow = partial(slots.changeWindow)
+        changeFrameSize = partial(slots.changeFrameSize)
+        changeOverlap = partial(slots.changeOverlap)
+        changeSynth = partial(slots.changeSynth)
+        play = partial(slots.play)
+        ##### End callbacks setup #####
+        
+        ##### Menus #####
         # File menu
         fileMenuActions = [\
                 self.createMenuAction("&Open a sound file...", 
@@ -56,7 +64,9 @@ class MainWindow(QMainWindow):
                 self.createMenuAction("Apply analysis settings", applyAnalysis,
                     "Ctrl+R", None, "Apply analysis settings and refresh"),
                 self.createMenuAction("S&ynthesize", synthesize,
-                    "Ctrl+Y", None, "Synthesize using current settings")]
+                    "Ctrl+Y", None, "Synthesize using current settings"),
+                self.createMenuAction("Play", play, "Ctrl+P", None,
+                    "Play current displayed waveform")]
         self.ASMenu = self.menuBar().addMenu("A&nalysis/Synthesis")
         for action in ASMenuActions:
             self.ASMenu.addAction(action)
@@ -98,21 +108,26 @@ class MainWindow(QMainWindow):
         status.showMessage("Welcome to TrackDraw!", 5000)
         ##### End status bar setup #####
         
-        ##### BUTTONS? #####
-        self.displayDock.regrabButton.clicked.connect(regrabPlots)
+        ##### Combo boxes #####
+        self.analysisDock.windowComboBox.activated.connect(changeWindow)
+        self.synthesisDock.methodComboBox.activated.connect(changeSynth)
+        #### End Combo Boxes Setup #####
         
+        ##### Sliders #####
+        self.analysisDock.frameSizeGroup.slider.valueChanged.connect(changeFrameSize)
+        self.analysisDock.overlapGroup.slider.valueChanged.connect(changeOverlap)
+        ##### End sliders setup #####
+        
+        ##### Buttons #####
         self.synthesisDock.synthButton.clicked.connect(synthesize)
-        
         self.displayDock.clearButton.clicked.connect(clearPlots)
-        
         self.analysisDock.applyButton.clicked.connect(applyAnalysis)
-        
         self.displayDock.synthedRadioButton.toggled.connect(switchPlots)
-        
         self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
-        ##### END BUTTONS #####
+        self.displayDock.showFTCheckBox.stateChanged.connect(enableTracks)
+        ##### End buttons setup #####
         
-        ##### Canvases setup #####
+        ##### Canvases #####
         click_f0 = partial(slots.mouse, wasClick=True, plot=self.cw.f0_cv, target="F0")
         drag_f0 = partial(slots.mouse, wasClick=False, plot=self.cw.f0_cv, target="F0")
         self.cw.f0_cv.fig.canvas.mpl_connect('button_press_event', click_f0)

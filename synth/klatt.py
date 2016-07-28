@@ -33,7 +33,7 @@ def klatt_make(parms):
     bw = parms.BW
     fs = parms.synth_fs
     dur = parms.dur
-    env = parms.envelope
+    env = parms.ENV
     y = klatt_bridge(f0, ff, bw, fs, dur, env)
     return(y)
     
@@ -122,9 +122,9 @@ class klatt_synth:
         self.rgz_c = -math.exp(-2*math.pi*6500*self.dt)
         self.rgz_b = (2*math.exp(-math.pi*6500*self.dt)*math.cos(2*math.pi*1500*self.dt))
         self.rgz_a = 1-self.rgz_b-self.rgz_c
-        self.rgs_c = -math.exp(-2*math.pi*200*self.dt)
-        self.rgs_b = (2*math.exp(-math.pi*200*self.dt)*math.cos(2*math.pi*0*self.dt))
-        self.rgs_a = 1-self.rgp_b-self.rgp_c
+#        self.rgs_c = -math.exp(-2*math.pi*200*self.dt)
+#        self.rgs_b = (2*math.exp(-math.pi*200*self.dt)*math.cos(2*math.pi*0*self.dt))
+#        self.rgs_a = 1-self.rgp_b-self.rgp_c
         
         # Initialize trackers
         self.last_glot_pulse = 0
@@ -139,10 +139,7 @@ class klatt_synth:
 
         # Initialize resonators
         self.rgp = Resonator(self)
-        self.rgz = Antiresonator(self, pep=False)
-        self.rgs = Resonator(self, pep=False)
-        self.noise = Noise_Gen(self)
-        self.voice_buffer = Buffer(self, 3)
+        self.rgz = Antiresonator(self)
         self.forms = []
         for form in range(self.n_form):
             self.forms.append(Resonator(self))
@@ -151,33 +148,21 @@ class klatt_synth:
         for i in range(self.n_inv):
             self.impulse_gen()
             self.rgp.resonate(self.rgp_a, self.rgp_b, self.rgp_c)
-            
             self.rgz.antiresonate(self.rgz_a, self.rgz_b, self.rgz_c)
-            self.voice_buffer.buffers[0][:] = self.output[self.current_ind:self.next_ind]
-
-            self.rgs.resonate(self.rgs_a, self.rgs_b, self.rgs_c) 
-            self.voice_buffer.buffers[1][:] = self.output[self.current_ind:self.next_ind]
-
-            self.noise.noise_gen()
-            self.voice_buffer.buffers[2][:] = self.output[self.current_ind:self.next_ind]
-
-            self.input[self.current_ind:self.next_ind] = self.voice_buffer.buffers[0][:]
-
             for form in range(self.n_form):
                 a, b, c = self.calc_coef(current_form=form)
                 self.forms[form].resonate(a, b, c)
-                self.radiation_characteristic()
+            self.radiation_characteristic()
             self.update_inv()
         self.reset()
             
-    def impulse_gen(self, pep=True):
+    def impulse_gen(self):
         glot_period = round(self.fs/self.f0[self.current_inv])
         for i in range(self.inv_samp):
             if (self.current_ind+i)-self.last_glot_pulse >= glot_period:
                 self.output[self.current_ind+i] = 1
                 self.last_glot_pulse = self.current_ind+i
-        if pep == True:
-            self.perpetuate()
+        self.perpetuate()
         
     def radiation_characteristic(self):
         if self.current_inv == 0:
@@ -237,10 +222,9 @@ class Resonator():
     the delay, using the samples in the delay to calculate the first two
     samples of the next interval, etc. etc.).
     """
-    def __init__(self, mast, pep=True):
+    def __init__(self, mast):
         self.mast = mast
         self.delay = [0] * 2
-        self.pep = pep
     
     def resonate(self, a, b, c):
         if self.mast.current_inv == 0:
@@ -264,18 +248,16 @@ class Resonator():
                      - (-b*self.mast.output[self.mast.current_ind+n-1])\
                      - (-c*self.mast.output[self.mast.current_ind+n-2])     
         self.delay[:] = self.mast.output[self.mast.next_ind-2:self.mast.next_ind]
-        if self.pep == True:
-            self.mast.perpetuate()
+        self.mast.perpetuate()
         
 class Antiresonator():
     """
     Functions similarly to Resonator, but with -dB in place of dB. See Klatt
     (1980) for more information.
     """
-    def __init__(self, mast, pep=True):
+    def __init__(self, mast):
         self.mast = mast
         self.delay = [0] * 2
-        self.pep = pep
     
     def antiresonate(self, a, b, c):
         a_prime = 1/a
@@ -305,51 +287,50 @@ class Antiresonator():
                      - (-b*self.mast.output[self.mast.current_ind+n-1])\
                      - (-c*self.mast.output[self.mast.current_ind+n-2])     
         self.delay[:] = self.mast.output[self.mast.next_ind-2:self.mast.next_ind]
-        if self.pep == True:
-            self.mast.perpetuate()
-        
-class Noise_Gen():
-    """
-    Noise generator. Still needs some work, doesn't sound right.
-    """
-    def __init__(self, mast, pep=True):
-        self.mast = mast
-        self.delay = [0]
-        self.pep = pep
-
-    def noise_gen(self):
-        import numpy as np
-        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.mast.inv_samp*16)
-        noise = np.zeros([self.mast.inv_samp])
-        for i in range(self.mast.inv_samp):
-            temp = np.zeros([16])
-            for j in range(16):
-                temp[j] = noise_big[i*16+j]
-            noise[i] = np.mean(temp)
-        self.mast.output[self.mast.current_ind:self.mast.next_ind] = noise[:]
         self.mast.perpetuate()
-        if self.mast.current_inv == 0:
-            self.mast.output[0] = self.mast.input[0]
-            for n in range(1, self.mast.inv_samp):
-                self.mast.output[self.mast.current_ind+n] =\
-                    self.mast.input[self.mast.current_ind+n]\
-                    + self.mast.input[self.mast.current_ind+n-1]
-        else:
-            self.mast.output[self.mast.current_ind] =\
-                    self.mast.input[self.mast.current_ind]\
-                    + self.delay[0]
-            for n in range(1, self.mast.inv_samp):
-                self.mast.output[self.mast.current_ind+n] =\
-                    self.mast.input[self.mast.current_ind+n]\
-                    + self.mast.input[self.mast.current_ind+n-1]
-        self.delay[0] = self.mast.output[self.mast.next_ind-1]
-        if self.pep == True:
-            self.mast.perpetuate()
         
-class Buffer():
-    
-    def __init__(self, mast, n_buffer):
-        self.mast = mast
-        self.buffers = []
-        for i in range(n_buffer):
-            self.buffers.append([0] * self.mast.inv_samp)
+#class Noise_Gen():
+#    """
+#    Noise generator. Still needs some work, doesn't sound right.
+#    """
+#    def __init__(self, mast, pep=True):
+#        self.mast = mast
+#        self.delay = [0]
+#        self.pep = pep
+#
+#    def noise_gen(self):
+#        import numpy as np
+#        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.mast.inv_samp*16)
+#        noise = np.zeros([self.mast.inv_samp])
+#        for i in range(self.mast.inv_samp):
+#            temp = np.zeros([16])
+#            for j in range(16):
+#                temp[j] = noise_big[i*16+j]
+#            noise[i] = np.mean(temp)
+#        self.mast.output[self.mast.current_ind:self.mast.next_ind] = noise[:]
+#        self.mast.perpetuate()
+#        if self.mast.current_inv == 0:
+#            self.mast.output[0] = self.mast.input[0]
+#            for n in range(1, self.mast.inv_samp):
+#                self.mast.output[self.mast.current_ind+n] =\
+#                    self.mast.input[self.mast.current_ind+n]\
+#                    + self.mast.input[self.mast.current_ind+n-1]
+#        else:
+#            self.mast.output[self.mast.current_ind] =\
+#                    self.mast.input[self.mast.current_ind]\
+#                    + self.delay[0]
+#            for n in range(1, self.mast.inv_samp):
+#                self.mast.output[self.mast.current_ind+n] =\
+#                    self.mast.input[self.mast.current_ind+n]\
+#                    + self.mast.input[self.mast.current_ind+n-1]
+#        self.delay[0] = self.mast.output[self.mast.next_ind-1]
+#        if self.pep == True:
+#            self.mast.perpetuate()
+        
+#class Buffer():
+#    
+#    def __init__(self, mast, n_buffer):
+#        self.mast = mast
+#        self.buffers = []
+#        for i in range(n_buffer):
+#            self.buffers.append([0] * self.mast.inv_samp)

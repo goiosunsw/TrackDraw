@@ -6,6 +6,7 @@ from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+import numpy as np
 import matplotlib
 matplotlib.use("QT5Agg")
 import matplotlib.pyplot as plt
@@ -39,7 +40,10 @@ class CanvasGrid(QWidget):
         mainGrid.addWidget(self.stft_cv, 1, 0)
         mainGrid.addWidget(self.spec_cv, 1, 1)
         mainGrid.addWidget(self.f0_cv, 2, 1)
-
+        
+        self.current_waveform = None
+        self.current_fs = None
+        
 
 class WaveCanvas(FigureCanvas):
     """
@@ -62,7 +66,7 @@ class WaveCanvas(FigureCanvas):
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
         
-        self.locked = False
+        self.enabled = True
         self.current_waveform = None
         
     def clear(self):
@@ -71,11 +75,10 @@ class WaveCanvas(FigureCanvas):
         
     def plot_waveform(self, waveform):
         self.current_waveform = waveform
-        if self.locked:
+        if self.enabled == False:
             self.clear()
         else:
             self.ax.plot(waveform)
-            self.ax.set_xlim(0, len(waveform))
             self.fig.canvas.draw()
 
 class STFTCanvas(FigureCanvas):
@@ -104,6 +107,10 @@ class SpecCanvas(FigureCanvas):
         self.background = None
         self.n_form = 5
         self.locked_track = 0
+        self.enabled = True
+        self.current_waveform = None
+        self.current_fs = None
+        self.current_dur = None
         
     def start(self, tracks):
         self.ax.clear()
@@ -127,29 +134,45 @@ class SpecCanvas(FigureCanvas):
         
     def update_track(self, new_track=0, trackNo=0, redraw=0):
         if redraw == 0:
+            self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
             self.tracks[trackNo][0].set_ydata(new_track)
             for i in range(self.n_form):
                 self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         else:
+            self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
-            for i in range(self.n_form):
-                self.ax.draw_artist(self.tracks[i][0])
+            if self.enabled:
+                for i in range(self.n_form):
+                    self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         
-    def plot_specgram(self, waveform, fs, window_len, window_type, tracks):
-        self.ax.clear()
-        self.tracks = []
-        self.ax.specgram(waveform, NFFT=window_len, Fs=fs,\
-                         noverlap=window_len*0.75, cmap=plt.cm.gist_heat)
-        xmin, xmax = self.ax.get_xlim()
-        self.fig.canvas.draw()
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-        for i in range(self.n_form):
-            self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
-        self.update_track(redraw=1)
-        return(xmin, xmax)
+    def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, noverlap=0.5, window_type=np.hanning, tracks=0, restart=False):
+        if restart == False:
+            self.current_waveform = waveform
+            self.current_fs = fs
+            self.current_x_right = x_right
+            self.ax.clear()
+            self.tracks = []
+            self.ax.set_xlim(0, x_right)
+            self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
+                             noverlap=int(window_len*noverlap), window=window_type(window_len), 
+                             cmap=plt.cm.gist_heat)
+            self.fig.canvas.draw()
+            self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+            for i in range(self.n_form):
+                self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
+            self.update_track(redraw=1)
+        elif restart == True:
+            self.ax.clear()
+            self.ax.set_xlim(0, self.current_x_right)
+            self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
+                             noverlap=int(window_len*noverlap), window=window_type(window_len), 
+                             cmap=plt.cm.gist_heat)
+            self.fig.canvas.draw()
+            self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+            self.update_track(redraw=1)            
         
 
 class F0Canvas(FigureCanvas):
@@ -212,8 +235,8 @@ class DisplayDock(QDockWidget):
         STFTCheckBox = QCheckBox("Show STFT")
         STFTCheckBox.setChecked(True)
 
-        showFTCheckBox = QCheckBox("Show formant tracks")
-        showFTCheckBox.setChecked(True)
+        self.showFTCheckBox = QCheckBox("Show formant tracks")
+        self.showFTCheckBox.setChecked(True)
         ### Clear plots button
         self.clearButton = QPushButton("Clear plots (Ctrl+L)")
         self.clearButton.setToolTip("Clear all plots")
@@ -223,6 +246,7 @@ class DisplayDock(QDockWidget):
         ### Regrab Plots Button
         self.regrabButton = QPushButton("Regrab plots")
         ###
+        
 
         ### Set up main widget
         mainWidget = QWidget()
@@ -232,7 +256,7 @@ class DisplayDock(QDockWidget):
         mainVBox.addWidget(dispGroupBox)
         mainVBox.addWidget(self.waveCheckBox)
         mainVBox.addWidget(STFTCheckBox)
-        mainVBox.addWidget(showFTCheckBox)
+        mainVBox.addWidget(self.showFTCheckBox)
         mainVBox.addWidget(self.clearButton)
         mainVBox.addWidget(self.regrabButton)
         mainVBox.addStretch()
@@ -271,28 +295,27 @@ class AnalysisDock(QDockWidget):
         windowVBox = QVBoxLayout()
         windowGroup.setLayout(windowVBox)
         windowLabel = QLabel("Window function:")
-        windowComboBox = QComboBox()
-        windowComboBox.addItems(["Hanning", "Rectangular"])
-        windowComboBox.setCurrentIndex(0)
+        self.windowComboBox = QComboBox()
+        self.windowComboBox.addItems(["Hamming", "Bartlett", "Blackman"])
+        self.windowComboBox.setCurrentIndex(0)
         windowVBox.addWidget(windowLabel)
-        windowVBox.addWidget(windowComboBox)
-
-
-        frameSizeGroup = SliderGroup(label="Frame size:", units="samples",
+        windowVBox.addWidget(self.windowComboBox)
+        
+        self.frameSizeGroup = SliderGroup(label="Frame size:", units="samples",
                 minimum=5, maximum=10, stepDouble=True, value=8)
 
-        overlapGroup = SliderGroup(label="Frame overlap:", units="%",
+        self.overlapGroup = SliderGroup(label="Frame overlap:", units="%",
                 minimum=5, maximum=15, stepSize=5, value=10)
 
-        thresholdGroup = SliderGroup(label="Threshold:", units="dB",
+        self.thresholdGroup = SliderGroup(label="Threshold:", units="dB",
                 minimum=0, maximum=10, stepSize=1, value=3)
 
         reassignCheckBox = QCheckBox("T-F reassignment")
 
         specVBox.addWidget(windowGroup)
-        specVBox.addWidget(frameSizeGroup)
-        specVBox.addWidget(overlapGroup)
-        specVBox.addWidget(thresholdGroup)
+        specVBox.addWidget(self.frameSizeGroup)
+        specVBox.addWidget(self.overlapGroup)
+        specVBox.addWidget(self.thresholdGroup)
         specVBox.addWidget(reassignCheckBox)
         ###
 
