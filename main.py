@@ -23,20 +23,25 @@ class MainWindow(QMainWindow):
         slots = TDS.Slots(master=self)
 
         ##### Callbacks #####
-        # Callbacks created using functools.partial, connected below
+        # Callbacks created using functools.partial
         audioOpen = partial(slots.audioOpen, parent=self)
         audioSave = partial(slots.audioSave, parent=self)
+        
         helpAbout = partial(slots.helpAbout, parent=self)
+        
         clearPlots = partial(slots.clearPlots)
-        applyAnalysis = partial(slots.applyAnalysis)
-        synthesize = partial(slots.synthesize)
         switchPlots = partial(slots.switchPlots)
         enableWave = partial(slots.enableWave)
         enableTracks = partial(slots.enableTracks)
+        
+        applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
         changeFrameSize = partial(slots.changeFrameSize)
         changeOverlap = partial(slots.changeOverlap)
+        
+        synthesize = partial(slots.synthesize)
         changeSynth = partial(slots.changeSynth)
+        
         play = partial(slots.play)
         ##### End callbacks setup #####
         
