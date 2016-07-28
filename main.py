@@ -33,6 +33,8 @@ class MainWindow(QMainWindow):
         switchPlots = partial(slots.switchPlots)
         enableWave = partial(slots.enableWave)
         enableTracks = partial(slots.enableTracks)
+        changeNoTracks = partial(slots.changeNoTracks)
+        self.onResize = partial(slots.onResize)
         
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
@@ -116,6 +118,7 @@ class MainWindow(QMainWindow):
         ##### Combo boxes #####
         self.analysisDock.windowComboBox.activated.connect(changeWindow)
         self.synthesisDock.methodComboBox.activated.connect(changeSynth)
+        self.synthesisDock.nformantComboBox.activated.connect(changeNoTracks)
         #### End Combo Boxes Setup #####
         
         ##### Sliders #####
@@ -143,7 +146,6 @@ class MainWindow(QMainWindow):
         self.cw.spec_cv.fig.canvas.mpl_connect('button_press_event', click_ff)
         self.cw.spec_cv.fig.canvas.mpl_connect('motion_notify_event', drag_ff)
         ##### End canvases setup #####
-
     
     def createMenuAction(self, text, slot=None, shortcut=None, icon=None,
             tip=None, checkable=False, signal="triggered()"):
@@ -160,6 +162,9 @@ class MainWindow(QMainWindow):
         if checkable:
             action.setCheckable(True)
         return action
+        
+    def resizeEvent(self, event):
+        self.onResize()
 
 
 def main():

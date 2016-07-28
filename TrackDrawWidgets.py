@@ -105,7 +105,7 @@ class SpecCanvas(FigureCanvas):
         
         self.tracks = []
         self.background = None
-        self.n_form = 5
+        self.nformant = 5
         self.locked_track = 0
         self.enabled = True
         self.current_waveform = None
@@ -119,7 +119,7 @@ class SpecCanvas(FigureCanvas):
         self.ax.set_ylim(0, 5000)
         self.fig.canvas.draw()
         self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-        for i in range(self.n_form):
+        for i in range(self.nformant):
             self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
         self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
         self.ax.set_ylim(0, 5000)
@@ -137,14 +137,14 @@ class SpecCanvas(FigureCanvas):
             self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
             self.tracks[trackNo][0].set_ydata(new_track)
-            for i in range(self.n_form):
+            for i in range(self.nformant):
                 self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         else:
             self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
             if self.enabled:
-                for i in range(self.n_form):
+                for i in range(self.nformant):
                     self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         
@@ -161,7 +161,7 @@ class SpecCanvas(FigureCanvas):
                              cmap=plt.cm.gist_heat)
             self.fig.canvas.draw()
             self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-            for i in range(self.n_form):
+            for i in range(self.nformant):
                 self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
             self.update_track(redraw=1)
         elif restart == True:
@@ -388,11 +388,11 @@ class SynthesisDock(QDockWidget):
         nformantVBox = QVBoxLayout()
         nformantGroup.setLayout(nformantVBox)
         nformantLabel = QLabel("Number of formant tracks:")
-        nformantComboBox = QComboBox()
-        nformantComboBox.addItems(["1", "2", "3", "4", "5"])
-        nformantComboBox.setCurrentIndex(4)
+        self.nformantComboBox = QComboBox()
+        self.nformantComboBox.addItems(["1", "2", "3", "4", "5"])
+        self.nformantComboBox.setCurrentIndex(4)
         nformantVBox.addWidget(nformantLabel)
-        nformantVBox.addWidget(nformantComboBox)
+        nformantVBox.addWidget(self.nformantComboBox)
 
         ### Klatt synthesis settings group box
         self.klattGroup = QGroupBox("Klatt synthesizer settings")

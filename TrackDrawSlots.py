@@ -59,19 +59,6 @@ class Slots:
                     Copyright (c) 2016
                     """
         QMessageBox.about(parent, "About", aboutText)        
-
-    @pyqtSlot()
-    def onResize(self, *arg, **kwarg):
-        if self.master.displayDock.synthedRadioButton.isChecked():
-            waveform = TDD.SYNTH_SOUND.waveform
-        elif self.master.displayDock.loadedRadioButton.isChecked():
-            waveform = TDD.LOADED_SOUND.waveform
-        if len(waveform) > 1:
-            self.master.cw.spec_cv.plot_specgram(TDD.TRACKS, restart=True)
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
-        else:
-            self.master.cw.spec_cv.start(TDD.TRACKS)
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
     ##### End misc slots #####
     
     
@@ -90,14 +77,7 @@ class Slots:
         
     @pyqtSlot()
     def switchPlots(self, *arg, **kwarg):
-        if self.master.displayDock.synthedRadioButton.isChecked():
-            waveform = TDD.SYNTH_SOUND.waveform
-            fs = TDD.SYNTH_SOUND.fs
-            dur = TDD.SYNTH_SOUND.dur
-        elif self.master.displayDock.loadedRadioButton.isChecked():
-            waveform = TDD.LOADED_SOUND.waveform
-            fs = TDD.LOADED_SOUND.fs
-            dur = TDD.SYNTH_SOUND.dur
+        waveform, fs, dur = self.getCurrentWaveform()
         if len(waveform) == 1:
             self.master.cw.spec_cv.start(TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(waveform)
@@ -119,6 +99,41 @@ class Slots:
             self.master.cw.wave_cv.clear()
         else:
             self.master.cw.wave_cv.plot_waveform(self.master.cw.wave_cv.current_waveform)
+            
+    @pyqtSlot()
+    def changeNoTracks(self, i, *arg, **kwarg):
+        new_nformant = i+1
+        if self.master.cw.spec_cv.nformant > new_nformant:
+            TDD.TRACKS = TDD.TRACKS[0:new_nformant]
+        elif self.master.cw.spec_cv.nformant < new_nformant:
+            TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[i]))
+        # Need to update both spec_cv's nformant and current_param's nformant
+        self.master.cw.spec_cv.nformant = new_nformant
+        TDD.CURRENT_PARAMS.nformant = new_nformant
+        waveform, fs, dur = self.getCurrentWaveform()            
+        if len(waveform) == 1:
+            self.master.cw.spec_cv.start(TDD.TRACKS)
+            self.master.cw.wave_cv.plot_waveform(waveform)
+            self.master.cw.wave_cv.clear()
+        else:
+            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
+                    TDD.CURRENT_PARAMS.window_len,
+                    TDD.CURRENT_PARAMS.noverlap,
+                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
+            self.master.cw.wave_cv.plot_waveform(waveform)
+            
+    @pyqtSlot()
+    def onResize(self, *arg, **kwarg):
+        if self.master.displayDock.synthedRadioButton.isChecked():
+            waveform = TDD.SYNTH_SOUND.waveform
+        elif self.master.displayDock.loadedRadioButton.isChecked():
+            waveform = TDD.LOADED_SOUND.waveform
+        if len(waveform) > 1:
+            self.master.cw.spec_cv.plot_specgram(TDD.TRACKS, restart=True)
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+        else:
+            self.master.cw.spec_cv.start(TDD.TRACKS)
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
     ##### End display slots #####
     
     
@@ -161,8 +176,8 @@ class Slots:
     def synthesize(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK.points
         TDD.CURRENT_PARAMS.FF = np.zeros([TDD.CURRENT_PARAMS.track_npoints,
-                                          TDD.CURRENT_PARAMS.n_form])
-        for i in range(TDD.CURRENT_PARAMS.n_form):
+                                          TDD.CURRENT_PARAMS.nformant])
+        for i in range(TDD.CURRENT_PARAMS.nformant):
             TDD.CURRENT_PARAMS.FF[:,i] = TDD.TRACKS[i].points
         if TDD.CURRENT_PARAMS.synth_type == "Klatt 1980":
             TDD.SYNTH_SOUND.waveform = synth.klatt.klatt_make(TDD.CURRENT_PARAMS)
@@ -214,15 +229,21 @@ class Slots:
     ##### Playback slots #####
     @pyqtSlot()
     def play(self):
+        waveform, fs, dur = self.getCurrentWaveform()
+        waveform = waveform/np.max(np.abs(waveform))*0.9
+        sd.play(waveform, fs)
+        time.sleep(dur)
+    ##### End playback slots #####
+    
+    ##### Non-slots #####
+    def getCurrentWaveform(self):
         if self.master.displayDock.synthedRadioButton.isChecked():
             waveform = TDD.SYNTH_SOUND.waveform
             fs = TDD.SYNTH_SOUND.fs
-            nsamples = TDD.SYNTH_SOUND.nsamples
+            dur = TDD.SYNTH_SOUND.dur
         elif self.master.displayDock.loadedRadioButton.isChecked():
             waveform = TDD.LOADED_SOUND.waveform
-            fs = TDD.LOADED_SOUND.fs  
-            nsamples = TDD.LOADED_SOUND.nsamples
-        waveform = waveform/np.max(np.abs(waveform))*0.9
-        sd.play(waveform, fs)
-        time.sleep(nsamples/fs)
-    ##### End playback slots #####
+            fs = TDD.LOADED_SOUND.fs
+            dur = TDD.SYNTH_SOUND.dur
+        return(waveform, fs, dur)
+    ##### End non-slots #####  

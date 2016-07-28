@@ -58,7 +58,7 @@ class Parameters:
                        ENV=np.array([0, 1, 1, 1, 0]),
                        radiation=0,
                        synth_type="Klatt 1980",
-                       n_form=5):
+                       nformant=5):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -74,9 +74,9 @@ class Parameters:
         self.ENV = ENV
         self.radiation = radiation
         self.synth_type = synth_type
-        self.n_form = n_form
-
-
+        self.nformant = nformant
+        
+        
 DEFAULT_PARAMS = Parameters()
 CURRENT_PARAMS = Parameters()
 LOADED_SOUND = Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
