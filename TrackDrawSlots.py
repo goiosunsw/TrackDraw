@@ -65,7 +65,8 @@ class Slots:
     ##### Display slots #####
     @pyqtSlot()
     def clearPlots(self, *arg, **kwarg):
-        print(TDD.F0_TRACK.points)
+        self.master.cw.wave_cv.clear()
+        self.master.cw.spec_cv.start(TDD.TRACKS)
         
     @pyqtSlot()
     def enableTracks(self, *arg, **kwarg):
@@ -101,16 +102,22 @@ class Slots:
             self.master.cw.wave_cv.plot_waveform(self.master.cw.wave_cv.current_waveform)
             
     @pyqtSlot()
-    def changeNoTracks(self, i, *arg, **kwarg):
-        new_nformant = i+1
+    def changeNoTracks(self, curr_index, *arg, **kwarg):
+        new_nformant = curr_index + 1
         if self.master.cw.spec_cv.nformant > new_nformant:
             TDD.TRACKS = TDD.TRACKS[0:new_nformant]
         elif self.master.cw.spec_cv.nformant < new_nformant:
-            TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[i]))
+            difference = abs(self.master.cw.spec_cv.nformant - new_nformant)
+            if difference == 1:
+                TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[curr_index]))          
+            elif difference > 1:
+                old_index = self.master.cw.spec_cv.nformant
+                for i in range(difference):
+                    TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[old_index+i]))
         # Need to update both spec_cv's nformant and current_param's nformant
         self.master.cw.spec_cv.nformant = new_nformant
         TDD.CURRENT_PARAMS.nformant = new_nformant
-        waveform, fs, dur = self.getCurrentWaveform()            
+        waveform, fs, dur = self.getCurrentWaveform()     
         if len(waveform) == 1:
             self.master.cw.spec_cv.start(TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(waveform)
@@ -121,6 +128,30 @@ class Slots:
                     TDD.CURRENT_PARAMS.noverlap,
                     TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(waveform)
+            
+    @pyqtSlot()
+    def changeNoPoints(self, *arg, **kwarg):
+        new_track_npoints = self.master.displayDock.track_npointsGroup.slider.value()
+        # Need to update both spec_cv/f0_cv and current_param's nformant
+        TDD.CURRENT_PARAMS.track_npoints = new_track_npoints
+        self.master.cw.spec_cv.track_npoints = new_track_npoints
+        self.master.cw.f0_cv.track_npoints = new_track_npoints
+        for i in range(len(TDD.TRACKS)):
+            TDD.TRACKS[i].changeNoPoints(new_track_npoints)
+        TDD.F0_TRACK.changeNoPoints(new_track_npoints)
+        waveform, fs, dur = self.getCurrentWaveform()  
+        if len(waveform) == 1:
+            self.master.cw.spec_cv.start(TDD.TRACKS)
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+            self.master.cw.wave_cv.plot_waveform(waveform)
+            self.master.cw.wave_cv.clear()
+        else:
+            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
+                    TDD.CURRENT_PARAMS.window_len,
+                    TDD.CURRENT_PARAMS.noverlap,
+                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
+            self.master.cw.wave_cv.plot_waveform(waveform)    
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
             
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
@@ -146,12 +177,12 @@ class Slots:
                                              tracks=TDD.TRACKS, restart=True)   
        
     @pyqtSlot()
-    def changeWindow(self, i, *arg, **kwarg):
-        if i == 0:
+    def changeWindow(self, curr_index, *arg, **kwarg):
+        if curr_index == 0:
             TDD.CURRENT_PARAMS.window_type = np.hamming
-        if i == 1:
+        if curr_index == 1:
             TDD.CURRENT_PARAMS.window_type = np.bartlett
-        if i == 2:
+        if curr_index == 2:
             TDD.CURRENT_PARAMS.window_type = np.blackman
                         
     @pyqtSlot()
@@ -166,12 +197,26 @@ class Slots:
     
     ##### Synthesis slots #####
     @pyqtSlot()
-    def changeSynth(self, i, *arg, **kwarg):
-        if i == 0:
+    def changeSynth(self, curr_index, *arg, **kwarg):
+        if curr_index == 0:
             TDD.CURRENT_PARAMS.synth_type = "Klatt 1980"
-        if i == 1:
+        if curr_index == 1:
             TDD.CURRENT_PARAMS.synth_type = "Sine wave"
-    
+            
+    @pyqtSlot()
+    def changeBW(self, *arg, **kwarg):
+        for i in range(5):
+            TDD.CURRENT_PARAMS.BW[i] = self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
+        
+    @pyqtSlot()
+    def changeSource(self, curr_index, *arg, **kwarg):
+        if curr_index == 0:
+            TDD.CURRENT_PARAMS.voicing = "Full Voicing"
+        if curr_index == 1:
+            TDD.CURRENT_PARAMS.voicing = "QS Voicing"
+        if curr_index == 2:
+            TDD.CURRENT_PARAMS.voicing = "Noise"
+            
     @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK.points
@@ -205,7 +250,7 @@ class Slots:
                 target = kwarg["target"]
                 wasClick = kwarg["wasClick"]
                 x_loc, y_loc = plot.mouse(event)
-                dist_to_x_pts = np.abs(np.linspace(0,TDD.DEFAULT_PARAMS.track_npoints-1,TDD.DEFAULT_PARAMS.track_npoints) - x_loc)
+                dist_to_x_pts = np.abs(np.linspace(0,TDD.CURRENT_PARAMS.track_npoints-1,TDD.CURRENT_PARAMS.track_npoints) - x_loc)
                 nearest_x_idx = dist_to_x_pts.argmin()
                 if target == "F0":
                     TDD.F0_TRACK.points[nearest_x_idx] = y_loc

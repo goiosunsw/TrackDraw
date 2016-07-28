@@ -35,6 +35,7 @@ class MainWindow(QMainWindow):
         enableTracks = partial(slots.enableTracks)
         changeNoTracks = partial(slots.changeNoTracks)
         self.onResize = partial(slots.onResize)
+        changeNoPoints = partial(slots.changeNoPoints)
         
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
@@ -42,7 +43,9 @@ class MainWindow(QMainWindow):
         changeOverlap = partial(slots.changeOverlap)
         
         synthesize = partial(slots.synthesize)
+        changeBW = partial(slots.changeBW)
         changeSynth = partial(slots.changeSynth)
+        changeSource = partial(slots.changeSource)
         
         play = partial(slots.play)
         ##### End callbacks setup #####
@@ -119,11 +122,15 @@ class MainWindow(QMainWindow):
         self.analysisDock.windowComboBox.activated.connect(changeWindow)
         self.synthesisDock.methodComboBox.activated.connect(changeSynth)
         self.synthesisDock.nformantComboBox.activated.connect(changeNoTracks)
+        self.synthesisDock.voicingComboBox.activated.connect(changeSource)
         #### End Combo Boxes Setup #####
         
         ##### Sliders #####
         self.analysisDock.frameSizeGroup.slider.valueChanged.connect(changeFrameSize)
         self.analysisDock.overlapGroup.slider.valueChanged.connect(changeOverlap)
+        for i in range(5):
+            self.synthesisDock.FFBandwidthGroup.sliders[i].valueChanged.connect(changeBW)
+        self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
         ##### End sliders setup #####
         
         ##### Buttons #####

@@ -37,6 +37,17 @@ class Track:
     """
     def __init__(self, points):
         self.points = points
+        
+    def changeNoPoints(self, track_npoints):
+        if len(self.points) == track_npoints:
+            return
+        elif len(self.points) > track_npoints:
+            self.points = self.points[0:track_npoints]
+        elif len(self.points) < track_npoints:
+            final_value = self.points[-1]
+            vector_to_be_appended = np.ones([track_npoints-len(self.points)])*final_value
+            self.points = np.concatenate((self.points, vector_to_be_appended))
+#            self.points = np.concatenate(self.points, np.ones([track_npoints-len(self.points)])*final_value)
 
         
 class Parameters:
@@ -49,7 +60,7 @@ class Parameters:
                        resample_fs=10000,
                        synth_fs=10000,
                        track_npoints=40,
-                       voicing="Voicing",
+                       voicing="Full Voicing",
                        window_len=256,
                        window_type=np.hamming,
                        noverlap=0.5,

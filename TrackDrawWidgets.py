@@ -106,6 +106,7 @@ class SpecCanvas(FigureCanvas):
         self.tracks = []
         self.background = None
         self.nformant = 5
+        self.track_npoints = DEFAULT_PARAMS.track_npoints
         self.locked_track = 0
         self.enabled = True
         self.current_waveform = None
@@ -115,13 +116,13 @@ class SpecCanvas(FigureCanvas):
     def start(self, tracks):
         self.ax.clear()
         self.tracks = []
-        self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+        self.ax.set_xlim(0, self.track_npoints-1)
         self.ax.set_ylim(0, 5000)
         self.fig.canvas.draw()
         self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
         for i in range(self.nformant):
             self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
-        self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+        self.ax.set_xlim(0, self.track_npoints-1)
         self.ax.set_ylim(0, 5000)
         self.fig.canvas.draw()
         
@@ -134,14 +135,14 @@ class SpecCanvas(FigureCanvas):
         
     def update_track(self, new_track=0, trackNo=0, redraw=0):
         if redraw == 0:
-            self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+            self.ax.set_xlim(0, self.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
             self.tracks[trackNo][0].set_ydata(new_track)
             for i in range(self.nformant):
                 self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         else:
-            self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+            self.ax.set_xlim(0, self.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
             if self.enabled:
                 for i in range(self.nformant):
@@ -187,16 +188,17 @@ class F0Canvas(FigureCanvas):
         
         self.f0_track = None
         self.background = None
+        self.track_npoints = DEFAULT_PARAMS.track_npoints
         
     def start(self, track):
         self.ax.clear()
-        self.tracks = []
-        self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+        self.f0_track = []
+        self.ax.set_xlim(0, self.track_npoints-1)
         self.ax.set_ylim(90, 150)
         self.fig.canvas.draw()
         self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
         self.f0_track = self.ax.plot(track.points, color="blue", marker="o")
-        self.ax.set_xlim(0, DEFAULT_PARAMS.track_npoints-1)
+        self.ax.set_xlim(0, self.track_npoints-1)
         self.ax.set_ylim(90, 150)
         self.fig.canvas.draw()
         
@@ -243,10 +245,11 @@ class DisplayDock(QDockWidget):
         self.clearButton.setStatusTip("Clear all plots")
         ###
         
-        ### Regrab Plots Button
-        self.regrabButton = QPushButton("Regrab plots")
+        ### track_npoints slider
+        self.track_npointsGroup = SliderGroup(label="Number of track points:",
+                units="points", minimum=20, maximum=80, stepDouble=False, 
+                value=40)
         ###
-        
 
         ### Set up main widget
         mainWidget = QWidget()
@@ -258,7 +261,7 @@ class DisplayDock(QDockWidget):
         mainVBox.addWidget(STFTCheckBox)
         mainVBox.addWidget(self.showFTCheckBox)
         mainVBox.addWidget(self.clearButton)
-        mainVBox.addWidget(self.regrabButton)
+        mainVBox.addWidget(self.track_npointsGroup)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
 
@@ -405,8 +408,7 @@ class SynthesisDock(QDockWidget):
         voicingLabel = QLabel("Voicing source:")
         self.voicingComboBox = QComboBox()
         self.voicingComboBox.addItems(\
-                ["Pulse train", "Sinusoidal", "White noise",
-                 "Liljencrants-Fant", "Rosenberg++"])
+                ["Full voicing", "Quasi-sinusoidal", "Noise"])
         self.voicingComboBox.setCurrentIndex(0)
         voicingVBox.addWidget(voicingLabel)
         voicingVBox.addWidget(self.voicingComboBox)
@@ -422,14 +424,16 @@ class SynthesisDock(QDockWidget):
         F5BandwidthGroup = SliderGroup(label="F5 bandwidth:", units="Hz",
                 minimum=5, maximum=20, value=10)
 
-        FFBandwidthGroup = SliderGroup2(\
+        self.FFBandwidthGroup = SliderGroup2(\
                 labels=["F1 bandwidth:", "F2 bandwidth:", "F3 bandwidth:",
                        "F4 bandwidth:", "F5 bandwidth:"],
                 units=["Hz", "Hz", "Hz", "Hz", "Hz"],
-                mins=[5, 5, 5, 5, 5],
-                maxs=[20, 20, 20, 20, 20],
-                values=[10, 10, 10, 10, 10],
-                stepSizes=[1, 1, 1, 1, 1],
+                mins=[10, 10, 10, 10, 10],
+                maxs=[50, 50, 50, 50, 50],
+                values=[DEFAULT_PARAMS.BW[0]/5, DEFAULT_PARAMS.BW[1]/5,
+                        DEFAULT_PARAMS.BW[2]/5, DEFAULT_PARAMS.BW[3]/5,
+                        DEFAULT_PARAMS.BW[4]/5],
+                stepSizes=[5, 5, 5, 5, 5],
                 stepDoubles=[False, False, False, False, False])
 
         klattVBox.addWidget(voicingLabel)
@@ -439,7 +443,7 @@ class SynthesisDock(QDockWidget):
         #klattVBox.addWidget(F3BandwidthGroup)
         #klattVBox.addWidget(F4BandwidthGroup)
         #klattVBox.addWidget(F5BandwidthGroup)
-        klattVBox.addWidget(FFBandwidthGroup)
+        klattVBox.addWidget(self.FFBandwidthGroup)
         ###
 
         ### Sine wave synthesis settings group box
@@ -566,22 +570,22 @@ class SliderGroup2(QWidget):
             self.unitsTxt = units[i]
             self.topLabel = QLabel(self.labelTxt + "  " + str(self.currValue)\
                           + " " + self.unitsTxt)
-            self.botSlider = QSlider(minimum=mins[i], maximum=maxs[i],
-                    value=values[i], orientation=Qt.Horizontal)
-            self.botSlider.valueChanged.connect(self.updateValueLabel)
+            self.sliders.append(QSlider(minimum=mins[i], maximum=maxs[i],
+                    value=values[i], orientation=Qt.Horizontal))
+#            self.sliders[i].connect(self.updateValueLabel)
 
             SliderGrid.addWidget(self.topLabel,  2*i, 0, 1, 3)
             SliderGrid.addWidget(minLabel,  2*i + 1, 0)
-            SliderGrid.addWidget(self.botSlider, 2*i + 1, 1)
+            SliderGrid.addWidget(self.sliders[i], 2*i + 1, 1)
             SliderGrid.addWidget(maxLabel,  2*i + 1, 2)
 
-    @pyqtSlot()
-    def updateValueLabel(self):
-        if self.stepDouble:
-            self.currValue = 2**self.botSlider.value()
-        else:
-            currValue = self.stepSize*self.botSlider.value()
-        newTopTxt = self.labelTxt + "  " + str(self.currValue)\
-                  + " " + self.unitsTxt
-        self.topLabel.setText(newTopTxt)
+#    @pyqtSlot()
+#    def updateValueLabel(self):
+#        if self.stepDouble:
+#            self.currValue = 2**self.botSlider.value()
+#        else:
+#            currValue = self.stepSize*self.botSlider.value()
+#        newTopTxt = self.labelTxt + "  " + str(self.currValue)\
+#                  + " " + self.unitsTxt
+#        self.topLabel.setText(newTopTxt)
 

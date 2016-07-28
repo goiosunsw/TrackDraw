@@ -47,7 +47,8 @@ def sine_make(params):
         phase = np.cumsum(2*np.pi*interpolated_formants[:,i]/Fs)
         waves.append(np.cos(phase))
     output_wave = np.zeros([n_samples])
-    output_wave = waves[0]+waves[1]+waves[2]+waves[3]+waves[4]
+    for i in range(n_formants):
+        output_wave = output_wave + waves[i]
     output_wave = output_wave*interpolated_envelope
     return(output_wave)
         
