@@ -33,6 +33,7 @@ class MainWindow(QMainWindow):
         switchPlots = partial(slots.switchPlots)
         enableWave = partial(slots.enableWave)
         enableTracks = partial(slots.enableTracks)
+        enableSTFT = partial(slots.enableSTFT)
         changeNoTracks = partial(slots.changeNoTracks)
         self.onResize = partial(slots.onResize)
         changeNoPoints = partial(slots.changeNoPoints)
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
         changeWindow = partial(slots.changeWindow)
         changeFrameSize = partial(slots.changeFrameSize)
         changeOverlap = partial(slots.changeOverlap)
+        changeSTFTSize = partial(slots.changeSTFTSize)
         
         synthesize = partial(slots.synthesize)
         changeBW = partial(slots.changeBW)
@@ -131,6 +133,7 @@ class MainWindow(QMainWindow):
         for i in range(5):
             self.synthesisDock.FFBandwidthGroup.sliders[i].valueChanged.connect(changeBW)
         self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
+        self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
         ##### End sliders setup #####
         
         ##### Buttons #####
@@ -140,6 +143,7 @@ class MainWindow(QMainWindow):
         self.displayDock.synthedRadioButton.toggled.connect(switchPlots)
         self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
         self.displayDock.showFTCheckBox.stateChanged.connect(enableTracks)
+        self.displayDock.STFTCheckBox.stateChanged.connect(enableSTFT)
         ##### End buttons setup #####
         
         ##### Canvases #####
@@ -184,6 +188,7 @@ def main():
     # but I'm not sure where they're referenced... DG 07/26
     mainWindow.cw.spec_cv.start(TDD.TRACKS)
     mainWindow.cw.f0_cv.start(TDD.F0_TRACK)
+    mainWindow.cw.stft_cv.start()
     app.exec_()
 
 

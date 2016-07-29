@@ -102,6 +102,17 @@ class Slots:
             self.master.cw.wave_cv.plot_waveform(self.master.cw.wave_cv.current_waveform)
             
     @pyqtSlot()
+    def enableSTFT(self, *arg, **kwarg):
+        if self.master.displayDock.STFTCheckBox.checkState() == 0:
+            self.master.cw.stft_cv.enabled = False
+        else:
+            self.master.cw.stft_cv.enabled = True
+        if self.master.cw.stft_cv.enabled == False:
+            self.master.cw.stft_cv.start()
+        else:
+            self.master.cw.stft_cv.start(restart=True)
+            
+    @pyqtSlot()
     def changeNoTracks(self, curr_index, *arg, **kwarg):
         new_nformant = curr_index + 1
         if self.master.cw.spec_cv.nformant > new_nformant:
@@ -175,6 +186,7 @@ class Slots:
                                              window_type=TDD.CURRENT_PARAMS.window_type,
                                              noverlap=TDD.CURRENT_PARAMS.noverlap,
                                              tracks=TDD.TRACKS, restart=True)   
+        self.master.cw.stft_cv.start()
        
     @pyqtSlot()
     def changeWindow(self, curr_index, *arg, **kwarg):
@@ -192,6 +204,12 @@ class Slots:
     @pyqtSlot()
     def changeOverlap(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.noverlap = self.master.analysisDock.overlapGroup.currValue*0.01
+        
+    @pyqtSlot()
+    def changeSTFTSize(self, *arg, **kwarg):
+        # Need to update both TDD and stft_cv's stftSize
+        TDD.CURRENT_PARAMS.stft_size = self.master.analysisDock.stftSizeGroup.currValue
+        self.master.cw.stft_cv.stft_size = self.master.analysisDock.stftSizeGroup.currValue
     ##### End analysis slots #####
     
     
@@ -244,6 +262,9 @@ class Slots:
     @pyqtSlot()
     def mouse(self, *arg, **kwarg):
         event = list(arg)[0]
+        x_loc = None
+        y_loc = None
+        # If mouse button is down, perform track updates
         if event.button:
             try:
                 plot = kwarg["plot"]
@@ -268,6 +289,33 @@ class Slots:
                         plot.update_track(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
             except TypeError:
                 pass
+        else:
+            try:
+                plot = kwarg["plot"]
+                target = kwarg["target"]
+                wasClick = kwarg["wasClick"]
+                x_loc, y_loc = plot.mouse(event)
+            except TypeError:
+                pass
+        # Regardless of if mouse button is down, perform stft update
+        waveform, fs, dur = self.getCurrentWaveform()
+        if x_loc == None:
+            try:
+                x_loc, y_loc = plot.mouse(event)
+            except TypeError:
+                pass
+            # Meed to convert from track dimensions to regular dimensions
+        try:
+            x_loc = x_loc/TDD.CURRENT_PARAMS.track_npoints
+            x_loc = int(x_loc*dur*fs)
+            if TDD.CURRENT_PARAMS.stft_size < x_loc < round(fs*dur)-TDD.CURRENT_PARAMS.stft_size:
+                waveform = waveform/np.max(np.abs(waveform))
+                magnitude = np.fft.rfft(waveform[x_loc-TDD.CURRENT_PARAMS.stft_size:x_loc+TDD.CURRENT_PARAMS.stft_size])
+                magnitude = 20*np.log10(np.abs(magnitude))
+                self.master.cw.stft_cv.update_stft(magnitude)
+        except TypeError:
+            pass
+#            self.master.cw.stft_cv.plot_magnitude(magnitude)
     ##### End track slots #####
     
     

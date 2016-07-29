@@ -75,11 +75,14 @@ class WaveCanvas(FigureCanvas):
         
     def plot_waveform(self, waveform):
         self.current_waveform = waveform
-        if self.enabled == False:
-            self.clear()
-        else:
-            self.ax.plot(waveform)
-            self.fig.canvas.draw()
+        try:
+            if self.enabled == False:
+                self.clear()
+            else:
+                self.ax.plot(waveform)
+                self.fig.canvas.draw()
+        except ValueError:
+            return
 
 class STFTCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -91,8 +94,38 @@ class STFTCanvas(FigureCanvas):
         self.fig.subplots_adjust(top=0.95, bottom=0.1)
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
+        
+        self.background = None
+        self.enabled = True
+        self.stft = None
+        self.current_stft = None
+        self.stft_size = DEFAULT_PARAMS.stft_size
+        
+    def start(self, restart=False):
+        self.ax.clear()
+        self.ax.set_xlim(-20, 40)
+        self.ax.set_ylim(0, self.stft_size)
+        self.fig.canvas.draw()
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        self.stft, = self.ax.plot(np.ones([self.stft_size])*-20, np.arange(self.stft_size))
+        self.fig.canvas.draw()
+        self.ax.set_xlim(-20, 40)
+        self.ax.set_ylim(0, self.stft_size)
+        if restart:
+            self.update_stft(self.current_stft)
+        
+    def update_stft(self, new_stft=0):
+        try:
+            self.stft.set_xdata(new_stft[0:-1])
+            self.current_stft = new_stft[0:-1]
+            self.fig.canvas.restore_region(self.background)
+            if self.enabled:
+                self.ax.draw_artist(self.stft)
+                self.fig.canvas.blit(self.ax.clipbox)
+        except RuntimeError:
+            pass
 
-
+            
 class SpecCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure()
@@ -149,7 +182,9 @@ class SpecCanvas(FigureCanvas):
                     self.ax.draw_artist(self.tracks[i][0])
             self.fig.canvas.blit(self.ax.clipbox)
         
-    def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, noverlap=0.5, window_type=np.hanning, tracks=0, restart=False):
+    def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, 
+                      noverlap=0.5, window_type=np.hanning, tracks=0, 
+                      restart=False):
         if restart == False:
             self.current_waveform = waveform
             self.current_fs = fs
@@ -234,8 +269,8 @@ class DisplayDock(QDockWidget):
         self.waveCheckBox = QCheckBox("Show waveform")
         self.waveCheckBox.setChecked(True)
 
-        STFTCheckBox = QCheckBox("Show STFT")
-        STFTCheckBox.setChecked(True)
+        self.STFTCheckBox = QCheckBox("Show STFT")
+        self.STFTCheckBox.setChecked(True)
 
         self.showFTCheckBox = QCheckBox("Show formant tracks")
         self.showFTCheckBox.setChecked(True)
@@ -258,7 +293,7 @@ class DisplayDock(QDockWidget):
 
         mainVBox.addWidget(dispGroupBox)
         mainVBox.addWidget(self.waveCheckBox)
-        mainVBox.addWidget(STFTCheckBox)
+        mainVBox.addWidget(self.STFTCheckBox)
         mainVBox.addWidget(self.showFTCheckBox)
         mainVBox.addWidget(self.clearButton)
         mainVBox.addWidget(self.track_npointsGroup)
@@ -304,14 +339,17 @@ class AnalysisDock(QDockWidget):
         windowVBox.addWidget(windowLabel)
         windowVBox.addWidget(self.windowComboBox)
         
-        self.frameSizeGroup = SliderGroup(label="Frame size:", units="samples",
+        self.frameSizeGroup = SliderGroup(label="Specgram Frame size:", units="samples",
                 minimum=5, maximum=10, stepDouble=True, value=8)
 
-        self.overlapGroup = SliderGroup(label="Frame overlap:", units="%",
+        self.overlapGroup = SliderGroup(label="Specgram Frame overlap:", units="%",
                 minimum=5, maximum=15, stepSize=5, value=10)
 
-        self.thresholdGroup = SliderGroup(label="Threshold:", units="dB",
+        self.thresholdGroup = SliderGroup(label="Specgram threshold:", units="dB",
                 minimum=0, maximum=10, stepSize=1, value=3)
+        
+        self.stftSizeGroup = SliderGroup(label="STFT frame size:", units="samples",
+                minimum=5, maximum=10, stepDouble=True, value=8)
 
         reassignCheckBox = QCheckBox("T-F reassignment")
 
@@ -319,6 +357,7 @@ class AnalysisDock(QDockWidget):
         specVBox.addWidget(self.frameSizeGroup)
         specVBox.addWidget(self.overlapGroup)
         specVBox.addWidget(self.thresholdGroup)
+        specVBox.addWidget(self.stftSizeGroup)
         specVBox.addWidget(reassignCheckBox)
         ###
 

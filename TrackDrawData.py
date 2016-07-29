@@ -69,7 +69,8 @@ class Parameters:
                        ENV=np.array([0, 1, 1, 1, 0]),
                        radiation=0,
                        synth_type="Klatt 1980",
-                       nformant=5):
+                       nformant=5,
+                       stft_size=64):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -86,6 +87,7 @@ class Parameters:
         self.radiation = radiation
         self.synth_type = synth_type
         self.nformant = nformant
+        self.stft_size = stft_size
         
         
 DEFAULT_PARAMS = Parameters()
