@@ -84,6 +84,7 @@ class WaveCanvas(FigureCanvas):
         except ValueError:
             return
 
+            
 class STFTCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure()
@@ -147,6 +148,12 @@ class SpecCanvas(FigureCanvas):
         self.current_dur = None
         
     def start(self, tracks):
+        """
+        Starts the spec_cv.
+        
+        Clears spec_cv, removes tracks, sets limits, draws canvas, grabs background,
+        draws tracks, draws canvas.
+        """
         self.ax.clear()
         self.tracks = []
         self.ax.set_xlim(0, self.track_npoints-1)
@@ -160,6 +167,13 @@ class SpecCanvas(FigureCanvas):
         self.fig.canvas.draw()
         
     def mouse(self, event):
+        """
+        Converts mouse location to data coordinates and returns if in range.
+        
+        Converts event.x and event.y to data coordinates using self.ax's 
+        transform methods. If the mouse is within the limits of the plot, the
+        values are returned.
+        """
         x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
         xmin, xmax = self.ax.get_xlim()
         ymin, ymax = self.ax.get_ylim()
@@ -167,6 +181,14 @@ class SpecCanvas(FigureCanvas):
             return(x_loc, y_loc)
         
     def update_track(self, new_track=0, trackNo=0, redraw=0):
+        """
+        Animates tracks.
+        
+        Accepts new_track data and trackNo. Restores the background, sets the
+        trackNo-th track data to new_track, draws all tracks, and then blits
+        axis clipbox. If redraw = 1, it does the same thing but without
+        updating any track data
+        """
         if redraw == 0:
             self.ax.set_xlim(0, self.track_npoints-1)
             self.fig.canvas.restore_region(self.background)
@@ -185,6 +207,11 @@ class SpecCanvas(FigureCanvas):
     def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, 
                       noverlap=0.5, window_type=np.hanning, tracks=0, 
                       restart=False):
+        """
+        Plots spectrogram on spec_cv
+        
+        TODO - reorganize function, clear up ambiguous operation, etc.
+        """
         if restart == False:
             self.current_waveform = waveform
             self.current_fs = fs
@@ -349,7 +376,7 @@ class AnalysisDock(QDockWidget):
                 minimum=0, maximum=10, stepSize=1, value=3)
         
         self.stftSizeGroup = SliderGroup(label="STFT frame size:", units="samples",
-                minimum=5, maximum=10, stepDouble=True, value=8)
+                minimum=5, maximum=10, stepDouble=True, value=6)
 
         reassignCheckBox = QCheckBox("T-F reassignment")
 

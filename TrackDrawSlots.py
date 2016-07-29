@@ -78,6 +78,11 @@ class Slots:
         
     @pyqtSlot()
     def switchPlots(self, *arg, **kwarg):
+        """
+        Switches between displaying the loaded or synthed signal.
+        
+        TODO - switchover update functionality to pushDisplayUpdates()
+        """
         waveform, fs, dur = self.getCurrentWaveform()
         if len(waveform) == 1:
             self.master.cw.spec_cv.start(TDD.TRACKS)
@@ -92,6 +97,9 @@ class Slots:
             
     @pyqtSlot()
     def enableWave(self, *arg, **kwarg):
+        """
+        Enables or disables wave display when the wave checkbox is clicked.
+        """
         if self.master.displayDock.waveCheckBox.checkState() == 0:
             self.master.cw.wave_cv.enabled = False
         else:
@@ -103,6 +111,9 @@ class Slots:
             
     @pyqtSlot()
     def enableSTFT(self, *arg, **kwarg):
+        """
+        Enables or disables STFT display when the STFT checkbox is clicked.
+        """
         if self.master.displayDock.STFTCheckBox.checkState() == 0:
             self.master.cw.stft_cv.enabled = False
         else:
@@ -114,6 +125,17 @@ class Slots:
             
     @pyqtSlot()
     def changeNoTracks(self, curr_index, *arg, **kwarg):
+        """
+        Changes the number of tracks when nformant combobox is activated.
+        
+        changeNoTracks updates spec_cv's nformant and CURRENT_PARAMS's nformant
+        and then properly removes or appends Track objects from/to TRACKS. Once
+        the nformant variables and TRACKS are properly updated, the current
+        waveform is grabbed and spec_cv/wave_cv are updated accordingly.
+        
+        TODO - add proper updates to stft_cv? 
+        TODO - switchover update functionality to pushDisplayUpdates()
+        """
         new_nformant = curr_index + 1
         if self.master.cw.spec_cv.nformant > new_nformant:
             TDD.TRACKS = TDD.TRACKS[0:new_nformant]
@@ -142,6 +164,19 @@ class Slots:
             
     @pyqtSlot()
     def changeNoPoints(self, *arg, **kwarg):
+        """
+        Changes the number of points in tracks when npoints slider is changed.
+        
+        changeNoPoints updates the number of points in both spec_cv and f0_cv's
+        line data whenever track_npointsGroup (slider) is updated. Updates the
+        track_npoints variable in CURRENT_PARAMS, spec_cv, and f0_cv, and then
+        grabs current waveform data and updates spec_cv/wave_cv/f0_cv
+        accordingly. If points are removed, the data within TRACKS/F0_TRACK is
+        simply truncated. If points are added, the the last data value in
+        TRACKS/F0_TRACK is appended as necessary to meet the new npoints value.
+        
+        TODO - switchover update functionality to pushDisplayUpdates()
+        """
         new_track_npoints = self.master.displayDock.track_npointsGroup.slider.value()
         # Need to update both spec_cv/f0_cv and current_param's nformant
         TDD.CURRENT_PARAMS.track_npoints = new_track_npoints
@@ -166,22 +201,24 @@ class Slots:
             
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
-        if self.master.displayDock.synthedRadioButton.isChecked():
-            waveform = TDD.SYNTH_SOUND.waveform
-        elif self.master.displayDock.loadedRadioButton.isChecked():
-            waveform = TDD.LOADED_SOUND.waveform
-        if len(waveform) > 1:
-            self.master.cw.spec_cv.plot_specgram(TDD.TRACKS, restart=True)
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
-        else:
-            self.master.cw.spec_cv.start(TDD.TRACKS)
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+        """
+        Called whenever a resize occurs, restarts all plots.
+        
+        On any resize of the main window, the current displayed waveform is
+        grabbed and sent to the pushDisplayUpdates function, which restarts
+        all animated plots so that their backgrounds are appropriately updated.
+        """
+        waveform, fs, dur = self.getCurrentWaveform()
+        self.pushDisplayUpdates(waveform, fs, dur)
     ##### End display slots #####
     
     
     ##### Analysis slots #####
     @pyqtSlot()
     def applyAnalysis(self, *arg, **kwarg):
+        """
+        Updates spec_cv and stft_cv to reflect analysis parameter changes.
+        """
         self.master.cw.spec_cv.plot_specgram(window_len=TDD.CURRENT_PARAMS.window_len,
                                              window_type=TDD.CURRENT_PARAMS.window_type,
                                              noverlap=TDD.CURRENT_PARAMS.noverlap,
@@ -237,6 +274,17 @@ class Slots:
             
     @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
+        """
+        Synthesizes waveform with current syntheis parameters.
+        
+        Synthesize updates CURRENT_PARAMS's F0 and FF information by extracting
+        it from F0_TRACK and TRACKS, then synthesizes a waveform based on the
+        current synthesis parameters and updates SYNTH_SOUND.waveform 
+        accordingly. Then, if the synth radio button is checked, the changes
+        to the waveform are reflected in the display.
+        
+        TODO - rewrite synthesizers to directly handle Track objects!
+        """
         TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK.points
         TDD.CURRENT_PARAMS.FF = np.zeros([TDD.CURRENT_PARAMS.track_npoints,
                                           TDD.CURRENT_PARAMS.nformant])
@@ -261,6 +309,36 @@ class Slots:
     ##### Track slots #####
     @pyqtSlot()
     def mouse(self, *arg, **kwarg):
+        """
+        Performs TRACKS, F0_TRACK, or stft updates depending on canvas activity
+        
+        Whenever spec_cv or f0_cv record mouse activity, this slot handles that
+        activity. If the mouse button is clicked on the spec_cv, the nearest
+        vertex to the mouse is found and updated to the mouse's location in the
+        y-dimension, and the index of the track to which the updated vertex 
+        belongs is set as locked_track. If the mouse button is clicked on
+        f0_cv, just the vertex update occurs. If the mouse is dragged on
+        spec_cv, the same updating that occurs with a click occurs, except
+        the track updated is always the locked_track from the most recent click.
+        If the mouse is dragged on the f0_cv, the same thing happens as with a 
+        click. Regardless of if the mouse button is down or not, the stft_cv is
+        updated with an stft around the mouse's current location if possible. 
+        
+        The general pattern for track updates is that an x_loc and y_loc are
+        received from the canvas if the mouse is within the bounds of the
+        plotted area. The x_loc and y_loc received are in coordinates in terms
+        of the tracks. Then, the nearest vertex is found, the track(s) data in
+        TDD is updated, and the updated track data is sent back to the relevant
+        canvas using the canvas' update_track method. 
+        
+        The general pattern for stft updates is that an x_loc and y_loc are
+        received from the canvas if the mouse is within the bounds of the
+        plotted area. The x_loc and y_loc received are in coordinates in terms
+        of the tracks, so x_loc is converted to be in terms of the samples of 
+        the displayed signal. Then, if an stft around that location is possible
+        (i.e. if an stft has room to be calculated) it is calculated, converted
+        to log scale, and passed to stft_cv via stft_cv's update_stft method.
+        """
         event = list(arg)[0]
         x_loc = None
         y_loc = None
@@ -330,6 +408,13 @@ class Slots:
     
     ##### Non-slots #####
     def getCurrentWaveform(self):
+        """
+        Grabs currently displayed waveform data.
+        
+        Checks which display radio button (synth or loaded) is currently 
+        checked. Then grabs the correct waveform, fs, and dur associated with
+        the current displayed signal. 
+        """
         if self.master.displayDock.synthedRadioButton.isChecked():
             waveform = TDD.SYNTH_SOUND.waveform
             fs = TDD.SYNTH_SOUND.fs
@@ -337,6 +422,33 @@ class Slots:
         elif self.master.displayDock.loadedRadioButton.isChecked():
             waveform = TDD.LOADED_SOUND.waveform
             fs = TDD.LOADED_SOUND.fs
-            dur = TDD.SYNTH_SOUND.dur
+            dur = TDD.LOADED_SOUND.dur
         return(waveform, fs, dur)
+        
+    def pushDisplayUpdates(self, waveform, fs, dur):
+        """
+        Updates all canvases to reflect any parameter changes.
+        
+        This is a utility function called by various slots whenever they change
+        elements pertaining to the canvases/display. It updates the display 
+        in an appropriate way. 
+        
+        TODO - better doc string
+        TODO - currently can't replace some similar functionality with this 
+        function, need to figure out what's different and make adjustments 
+        accordingly. (i.e. don't use it yet, except for resizing)
+        """
+        if len(waveform) == 1:
+            self.master.cw.spec_cv.start(TDD.TRACKS)
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+            self.master.cw.wave_cv.plot_waveform(waveform)
+            self.master.cw.wave_cv.clear()
+        else:
+            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
+                    TDD.CURRENT_PARAMS.window_len,
+                    TDD.CURRENT_PARAMS.noverlap,
+                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS, restart=True)
+            self.master.cw.wave_cv.plot_waveform(waveform)
+            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+        
     ##### End non-slots #####  
