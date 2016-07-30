@@ -2,7 +2,7 @@
 @name:    klatt.py
 @author:  Daniel R Guest
 @date:    07/20/2016
-@version: 0.2.0
+@version: 0.2.1
 @purpose: Klatt voice synthesizer and interface between TrackDraw 2016 and
           Klatt syntheiszer.
 
@@ -33,11 +33,12 @@ def klatt_make(parms):
     bw = parms.BW
     fs = parms.synth_fs
     dur = parms.dur
-    env = parms.envelope
-    y = klatt_bridge(f0, ff, bw, fs, dur, env)
+    env = parms.ENV
+    source = parms.voicing
+    y = klatt_bridge(f0, ff, bw, fs, dur, env, source)
     return(y)
     
-def klatt_bridge(f0, ff, bw, fs, dur, env, inv_samp=50):
+def klatt_bridge(f0, ff, bw, fs, dur, env, source, inv_samp=50):
     """
     Takes a variety of synthesis parameters passed to it from klatt_make and 
     interpolates them or derives other values from them as necessary for Klatt
@@ -70,15 +71,19 @@ def klatt_bridge(f0, ff, bw, fs, dur, env, inv_samp=50):
     interp_env = []
     interp_f0 = interpolate(f0, n_inv)
     for i in range(n_form):
-        interp_ff.append(interpolate(ff[:,i], n_inv))
-        interp_bw.append(interpolate(bw[:,i], n_inv))
+            interp_ff.append(interpolate(ff[:,i], n_inv))
+            try:
+                interp_bw.append(interpolate(bw[:,i], n_inv))
+            except IndexError:
+                interp_bw.append(interpolate(bw[i], n_inv))
     interp_env = interpolate(env, n_inv)
     # Finally, create synth object, run it, and return its output waveform    
     synth = klatt_synth(f0=interp_f0, ff=interp_ff, bw=interp_bw,
                         env=interp_env, fs=fs, n_inv=n_inv, n_form=n_form,
-                        inv_samp=inv_samp)
+                        inv_samp=inv_samp, source=source)
     synth.synth()
     return(synth.output)
+    
     
 class klatt_synth:
     """
@@ -99,7 +104,7 @@ class klatt_synth:
     generation, coefficient calculation, index updating, etc.) are contained 
     within methods of the klatt_synth class. [This will likely change!]
     """
-    def __init__(self, f0, ff, bw, env, fs, n_inv, n_form, inv_samp):
+    def __init__(self, f0, ff, bw, env, fs, n_inv, n_form, inv_samp, source):
         import math
         # Initialize time-varying synthesis parameters
         self.f0 = f0
@@ -119,6 +124,9 @@ class klatt_synth:
         self.rgz_c = -math.exp(-2*math.pi*6500*self.dt)
         self.rgz_b = (2*math.exp(-math.pi*6500*self.dt)*math.cos(2*math.pi*1500*self.dt))
         self.rgz_a = 1-self.rgz_b-self.rgz_c
+        self.rgs_c = -math.exp(-2*math.pi*200*self.dt)
+        self.rgs_b = (2*math.exp(-math.pi*200*self.dt)*math.cos(2*math.pi*0*self.dt))
+        self.rgs_a = 1-self.rgp_b-self.rgp_c
         
         # Initialize trackers
         self.last_glot_pulse = 0
@@ -132,31 +140,25 @@ class klatt_synth:
         self.output = [0] * self.n_inv*self.inv_samp
 
         # Initialize resonators
-        self.rgp = Resonator(self)
-        self.rgz = Antiresonator(self)
+        if source == "Full Voicing":
+            self.source = Full_Voicing(self)
+        if source == "QS Voicing":
+            self.source = QS_Voicing(self)
+        if source == "Noise":
+            self.source = Noise(self)
         self.forms = []
         for form in range(self.n_form):
             self.forms.append(Resonator(self))
         
     def synth(self):
         for i in range(self.n_inv):
-            self.impulse_gen()
-            self.rgp.resonate(self.rgp_a, self.rgp_b, self.rgp_c)
-            self.rgz.antiresonate(self.rgz_a, self.rgz_b, self.rgz_c)
+            self.source.generate()
             for form in range(self.n_form):
                 a, b, c = self.calc_coef(current_form=form)
                 self.forms[form].resonate(a, b, c)
-                self.radiation_characteristic()
+            self.radiation_characteristic()
             self.update_inv()
         self.reset()
-            
-    def impulse_gen(self):
-        glot_period = round(self.fs/self.f0[self.current_inv])
-        for i in range(self.inv_samp):
-            if (self.current_ind+i)-self.last_glot_pulse >= glot_period:
-                self.output[self.current_ind+i] = 1
-                self.last_glot_pulse = self.current_ind+i
-        self.perpetuate()
         
     def radiation_characteristic(self):
         if self.current_inv == 0:
@@ -168,22 +170,6 @@ class klatt_synth:
                 self.output[self.current_ind+n] =\
                      self.input[self.current_ind+n]\
                      - self.input[self.current_ind+n-1]
-        
-#    def noise_gen(self):
-#        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.inv_samp*16)
-#        noise = np.zeros([self.inv_samp])
-#        for i in range(self.inv_samp):
-#            temp = np.zeros([16])
-#            for j in range(16):
-#                temp[j] = noise_big[i*8+j]
-#            noise[i] = np.mean(temp)
-#        self.output[self.current_ind:self.next_ind] = noise[:]
-#        self.perpetuate()    
-#        # Apply 6 dB/oct filter
-#        noise_out = np.zeros([n_samples])
-#        noise_out[0] = (1/2)*noise[0]
-#        for i in range(1, n_samples, 1):
-#            noise_out[i] = (1/2)*(noise[i] + noise[i-1])
                 
     def calc_coef(self, current_form):
         import math
@@ -220,7 +206,8 @@ class klatt_synth:
         self.next_ind = self.next_inv*self.inv_samp
         self.input = [0] * self.n_inv*self.inv_samp
 
-class Resonator(object):
+
+class Resonator:
     """
     Resonator ala Klatt (1980). If the interval being processed is the first
     interval, the first fifty samples are calculated assuming that input(-1)
@@ -260,7 +247,8 @@ class Resonator(object):
         self.delay[:] = self.mast.output[self.mast.next_ind-2:self.mast.next_ind]
         self.mast.perpetuate()
         
-class Antiresonator(object):
+        
+class Antiresonator:
     """
     Functions similarly to Resonator, but with -dB in place of dB. See Klatt
     (1980) for more information.
@@ -298,3 +286,83 @@ class Antiresonator(object):
                      - (-c*self.mast.output[self.mast.current_ind+n-2])     
         self.delay[:] = self.mast.output[self.mast.next_ind-2:self.mast.next_ind]
         self.mast.perpetuate()
+        
+        
+class Full_Voicing:
+    
+    def __init__(self, mast):
+        self.mast = mast
+        self.rgp = Resonator(self.mast)
+        self.rgz = Resonator(self.mast)
+        
+    def generate(self):
+        glot_period = round(self.mast.fs/self.mast.f0[self.mast.current_inv])
+        for i in range(self.mast.inv_samp):
+            if (self.mast.current_ind+i)-self.mast.last_glot_pulse >= glot_period:
+                self.mast.output[self.mast.current_ind+i] = 1
+                self.mast.last_glot_pulse = self.mast.current_ind+i
+        self.mast.perpetuate()
+        self.rgp.resonate(self.mast.rgp_a, self.mast.rgp_b, self.mast.rgp_c)
+        self.rgz.resonate(self.mast.rgz_a, self.mast.rgz_b, self.mast.rgz_c)
+        
+        
+class QS_Voicing:
+    
+    def __init__(self, mast):
+        self.mast = mast
+        self.rgp = Resonator(self.mast)
+        self.rgs = Resonator(self.mast)
+    
+    def generate(self):
+        glot_period = round(self.mast.fs/self.mast.f0[self.mast.current_inv])
+        for i in range(self.mast.inv_samp):
+            if (self.mast.current_ind+i)-self.mast.last_glot_pulse >= glot_period:
+                self.mast.output[self.mast.current_ind+i] = 1
+                self.mast.last_glot_pulse = self.mast.current_ind+i
+        self.mast.perpetuate()
+        self.rgp.resonate(self.mast.rgp_a, self.mast.rgp_b, self.mast.rgp_c)
+        self.rgs.resonate(self.mast.rgs_a, self.mast.rgs_b, self.mast.rgs_c)        
+        
+        
+class Noise:
+    
+    def __init__(self, mast):
+        self.mast = mast
+        self.delay = [0]     
+   
+    def generate(self):
+        import numpy as np
+        noise_big = np.random.uniform(low = 0.0, high = 1.0, size = self.mast.inv_samp*16)
+        noise = np.zeros([self.mast.inv_samp])
+        for i in range(self.mast.inv_samp):
+            temp = np.zeros([16])
+            for j in range(16):
+                temp[j] = noise_big[i*16+j]
+            noise[i] = np.mean(temp)
+        self.mast.output[self.mast.current_ind:self.mast.next_ind] = noise[:]
+        self.mast.perpetuate()
+        if self.mast.current_inv == 0:
+            self.mast.output[0] = self.mast.input[0]
+            for n in range(1, self.mast.inv_samp):
+                self.mast.output[self.mast.current_ind+n] =\
+                    self.mast.input[self.mast.current_ind+n]\
+                    + self.mast.input[self.mast.current_ind+n-1]
+        else:
+            self.mast.output[self.mast.current_ind] =\
+                    self.mast.input[self.mast.current_ind]\
+                    + self.delay[0]
+            for n in range(1, self.mast.inv_samp):
+                self.mast.output[self.mast.current_ind+n] =\
+                    self.mast.input[self.mast.current_ind+n]\
+                    + self.mast.input[self.mast.current_ind+n-1]
+        self.delay[0] = self.mast.output[self.mast.next_ind-1]
+        self.mast.perpetuate()
+
+        
+#class Buffer():
+#    
+#    def __init__(self, mast, n_buffer):
+#        self.mast = mast
+#        self.buffers = []
+#        for i in range(n_buffer):
+#            self.buffers.append([0] * self.mast.inv_samp)
