@@ -107,19 +107,19 @@ def klatt_bridge(f0, ff, bw, fs, dur, env, source, inv_samp=50):
 class Klatt_Synth:
     """
     Synthesizes vowels ala Klatt 1980.
-    
-    p
-    
-    f0 -- fundamental frequency contour (list, len n_inv)
-    ff -- formant frequency contour (list of n_form lists, len n_inv)
-    bw -- bandwidth values for formants (list of n_form lists, len n_inv)
-    env -- normalized envelope values (list, len n_inv)
-    fs -- sample rate to synthesize at (integer)
-    n_inv -- number of intervals of length inv_samp samples to be synthesized
-             (integer)
-    n_form -- number of formants to be synthesized (integer)
-    inv_samp -- length of each interval in samples (integer)
-    source -- type of source to be used (string, see TrackDrawSlots)
+
+    Arguments:
+        f0 (list, len n_inv) -- fundamental frequency contour
+        ff (lists, n_form, len n_inv) -- formant frequency contours
+        bw (lists, n_form, len n_inv) -- bandwidth contours
+        env -- DEPRICATED, TODO - remove
+        fs (integer) -- sample rate in Hz
+        n_inv (integer) -- number of intervals of length inv_samp samples to be
+            synthesized.
+        n_form (integer) -- number of formants to be synthesized (integer).
+            Cannot vary over the duration of the synthesized vowel.
+        inv_samp (integer) -- length of each interval in samples
+        source -- DEPRICATED, TODO - remove
     
     To generate a waveform from a Klatt_Synth object using the parameters
     provided to it, call its synth() method.
@@ -148,10 +148,13 @@ class Klatt_Synth:
     components both have input_connect arguments, sections always pass their
     input_connect down to a child component, thus only components have pull()
     methods (and thus while components have their own input and output vectors,
-    sections only have output vectors since they never directly handle the
-    signal).
+    sections only have output vectors). 
     
-    TODO -- add the rest of the Klatt synthesizer
+    TODO -- add AV/AVS input dB values
+    TODO -- remove references to source and env arguments
+    TODO -- add nasal resonators
+    TODO -- Add other sections (noise source and parallel branch)
+    TODO -- Optimize
     """
     def __init__(self, f0, ff, bw, env, fs, n_inv, n_form, inv_samp, source):
         # Initialize time-varying synthesis parameters
@@ -181,12 +184,14 @@ class Klatt_Synth:
         self.voice = Klatt_Voice(self)
         self.cascade = Klatt_Cascade(self, [self.voice])
         self.radiation = Klatt_Radiation(self, [self.cascade])
-        self.output_module = Klatt_Output(self, self.radiation)
+        self.output_module = Klatt_Output(self, [self.radiation])
         
     def synth(self):
         """
         Runs each section of the synthesizer in the correct order.
         """
+        import time
+        start = time.time()
         for i in range(self.n_inv):
             self.voice.run()
             self.cascade.run()
@@ -194,6 +199,8 @@ class Klatt_Synth:
             self.output_module.run()
             self.update_inv() 
         self.reset()
+        end = time.time()
+        print("Elapsed: ", end-start)
                 
     def update_inv(self):
         """
@@ -215,19 +222,32 @@ class Klatt_Synth:
 
 
 ##### START SECTIONS #####
-class Klatt_Voice:
+class Klatt_Section:
     """
-    Generates a voicing waveform. 
+    Parent class for section-level objects in the TrackDraw Klatt synthesizer.
+    
+    Arguments:
+        master (Klatt_Synth object) -- Klatt_Synth object this section is part of
+    
+    All sections have a master (which refers back to the Klatt_Synth object
+    they are a part of), an output of length inv_samp, and a run method.
     """
     def __init__(self, master):
         self.master = master
         self.output = [0]*self.master.inv_samp
+
+class Klatt_Voice(Klatt_Section):
+    """
+    Generates a voicing waveform. 
+    """
+    def __init__(self, master):
+        Klatt_Section.__init__(self, master)
         self.impulse = Impulse(master=self.master)
-        self.rgp = Resonator(master=self.master, input_connect=self.impulse)
-        self.rgz = Resonator(master=self.master, input_connect=self.rgp, anti=True)
-        self.rgs = Resonator(master=self.master, input_connect=self.rgp)
-        self.av = Amplifier(master=self.master, input_connect=self.rgz)
-        self.avs = Amplifier(master=self.master, input_connect=self.rgs)
+        self.rgp = Resonator(master=self.master, input_connect=[self.impulse])
+        self.rgz = Resonator(master=self.master, input_connect=[self.rgp], anti=True)
+        self.rgs = Resonator(master=self.master, input_connect=[self.rgp])
+        self.av = Amplifier(master=self.master, input_connect=[self.rgz])
+        self.avs = Amplifier(master=self.master, input_connect=[self.rgs])
         self.mixer = Mixer(master=self.master, input_connect=[self.av, self.avs])
         
     def run(self):
@@ -240,19 +260,21 @@ class Klatt_Voice:
         self.mixer.mix()
         self.output[:] = self.mixer.output[:]
         
-class Klatt_Cascade:
+class Klatt_Cascade(Klatt_Section):
     """
     Simulates a vocal tract with a cascade of resonators.
+    
+    Arguments:
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.output = [0]*self.master.inv_samp
+        Klatt_Section.__init__(self, master)
         self.mixer = Mixer(master=self.master, input_connect=input_connect)
         self.formants = []
-        self.formants.append(Resonator(master=self.master, input_connect=self.mixer))
+        self.formants.append(Resonator(master=self.master, input_connect=[self.mixer]))
         previous_formant = self.formants[0]
         for i in range(1, self.master.n_form):
-            self.formants.append(Resonator(master=self.master, input_connect=previous_formant))
+            self.formants.append(Resonator(master=self.master, input_connect=[previous_formant]))
             previous_formant = self.formants[i]
 
     def run(self):
@@ -262,54 +284,85 @@ class Klatt_Cascade:
                                          self.master.bw[form][self.master.current_inv])
         self.output[:] = self.formants[-1].output[:]
 
-class Klatt_Radiation:
+class Klatt_Radiation(Klatt_Section):
     """
     Simulates the effect of radiation characteristic in vocal tract. 
+    
+    Arguments:
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.output = [0]*self.master.inv_samp
+        Klatt_Section.__init__(self, master)
         self.mixer = Mixer(master=self.master, input_connect=input_connect)
         self.radiation_characteristic = Rad_Char(master=self.master,
-                                                 input_connect=self.mixer)
+                                                 input_connect=[self.mixer])
         
     def run(self):
         self.mixer.mix()
         self.radiation_characteristic.radiate()
         self.output[:] = self.radiation_characteristic.output[:]
 
-class Klatt_Output:
+
+class Klatt_Output(Klatt_Section):
     """
-    Writes to Klatt_Synth object's output vector.
+    Transfers output buffer of final section to Klatt_Synth's main output
+    
+    Arguments:
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.input_connect = input_connect
+        Klatt_Section.__init__(self, master)
+        self.output = Output(master=self.master, input_connect=input_connect)
         
     def run(self):
-        self.master.output[self.master.current_ind:self.master.next_ind] = self.input_connect.output[:]
+        self.output.run()
 ##### END SECTIONS #####        
 
 
 ##### START COMPONENTS #####
-class Resonator:
+class Klatt_Component:
     """
-    Klatt resonator.
+    Parent class for component-level objects in the TrackDraw Klatt synthesizer. 
+    
+    Arguments:
+        master (Klatt_Synth object) -- Klatt_Synth object this section is part of
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string
     """
-    def __init__(self, master, input_connect=None, anti=False):
+    def __init__(self, master, input_connect=None):
         self.master = master
-        self.anti = anti
-        self.delay = [0]*2
         self.input = [0]*self.master.inv_samp
         self.output = [0]*self.master.inv_samp
         self.input_connect = input_connect
         
     def pull(self):
+        """ Perpetuates signal from previous component to this component """
         self.input = [0]*self.master.inv_samp
         self.output = [0]*self.master.inv_samp
-        self.input[:] = self.input_connect.output[:]
+        self.input[:] = self.input_connect[0].output[:]
+        
+
+class Resonator(Klatt_Component):
+    """
+    Klatt resonator.
+    
+    Arguments:
+        anti (boolean) -- if True, Resonator will act as antiresonator
+    """
+    def __init__(self, master, input_connect=None, anti=False):
+        Klatt_Component.__init__(self, master, input_connect)
+        self.anti = anti
+        self.delay = [0]*2
 
     def calc_coef(self, ff, bw, anti=False):
+        """
+        Calculates coefficients for digital resonator according to Klatt 1980
+        
+        Arguments:
+            ff (float) -- center frequency in Hz
+            bw (float) -- bandwidth in Hz
+            anti (boolean) -- if True, will calculate coefficients for
+                antiresonator
+        """
         import math
         c = -math.exp(-2*math.pi*bw*self.master.dt)
         b = (2*math.exp(-math.pi*bw*self.master.dt)\
@@ -334,13 +387,12 @@ class Resonator:
         self.delay[:] = self.output[len(self.output)-2:len(self.output)]
 
 
-class Impulse:
+class Impulse(Klatt_Component):
     """
     Klatt time-varying impulse generator.
     """
     def __init__(self, master):
-        self.master = master
-        self.output = [0]*self.master.inv_samp
+        Klatt_Component.__init__(self, master)
         
     def impulse_gen(self):
         self.output = [0]*self.master.inv_samp
@@ -351,22 +403,15 @@ class Impulse:
                 self.master.last_glot_pulse = self.master.current_ind + n
                 
                 
-class Amplifier:
+class Amplifier(Klatt_Component):
     """
     Simple amplifier.
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.input = [0]*self.master.inv_samp
-        self.output = [0]*self.master.inv_samp
-        self.input_connect = input_connect
-    
-    def pull(self):
-        self.input = [0]*self.master.inv_samp
-        self.output = [0]*self.master.inv_samp
-        self.input[:] = self.input_connect.output[:]
+        Klatt_Component.__init__(self, master, input_connect)
             
     def amplify(self, dB):
+        """ Scales amplitude by dB value, e.g. dB=0 leaves unaltered """
         import math
         self.pull()
         dB = math.sqrt(10)**(dB/10)
@@ -374,19 +419,18 @@ class Amplifier:
             self.output[n] = self.input[n]*dB
 
 
-class Mixer:
+class Mixer(Klatt_Component):
     """
     Simple mixer. 
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.input = [0]*self.master.inv_samp
-        self.output = [0]*self.master.inv_samp
-        self.input_connect = []
-        for i in range(len(input_connect)):
-            self.input_connect.append(input_connect[i])
+        Klatt_Component.__init__(self, master, input_connect)
             
     def mix(self):
+        """
+        Similar operation to Klatt_Component.pull() but mixes multiple inputs
+        together. 
+        """
         for n in range(self.master.inv_samp):
             temp = []
             for j in range(len(self.input_connect)):
@@ -395,21 +439,13 @@ class Mixer:
         self.output[:] = self.input[:]
 
 
-class Rad_Char:
+class Rad_Char(Klatt_Component):
     """
     Simple first difference operator to simulate radiation characteristic.
     """
     def __init__(self, master, input_connect=None):
-        self.master = master
-        self.input = [0]*self.master.inv_samp
-        self.output = [0]*self.master.inv_samp
+        Klatt_Component.__init__(self, master, input_connect)
         self.delay = [0]*1
-        self.input_connect = input_connect
-        
-    def pull(self):
-        self.input = [0]*self.master.inv_samp
-        self.output = [0]*self.master.inv_samp
-        self.input[:] = self.input_connect.output[:]
 
     def radiate(self):
         self.pull()
@@ -417,5 +453,14 @@ class Rad_Char:
         for n in range(1, self.master.inv_samp):
             self.output[n] = self.input[n] - self.input[n-1]
         self.delay[0] = self.input[-1]
-##### END COMPONENTS #####                   
 
+
+class Output(Klatt_Component):
+    """ Writes input buffer to master Klatt_Synth's main output """
+    def __init__(self, master, input_connect=None):
+        Klatt_Component.__init__(self, master, input_connect)
+        
+    def run(self):
+        self.pull()
+        self.master.output[self.master.current_ind:self.master.next_ind] = self.input[:]
+##### END COMPONENTS #####                   
