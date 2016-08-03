@@ -12,10 +12,25 @@ import matplotlib.mlab as mlab
 
 class Sound:
     """
-    The Sound class now automatically updates n_samples whenever the waveform
-    attribute changes. n_samples should never be changed individually.
+    Any loaded or synthesized sound.
+    
+    Arguments:
+        fs (int) -- sample rate in Hz.
+        waveform (np.array) -- signal of the sound.
+        nchannels (int) -- number of channels in the sound file.
+
+    Attributes:
+        fs -- see above
+        waveform -- see above
+        nchannels -- see above
+        nsamples (int) -- number of samples in signal.
+        dur (float) -- length of signal in seconds.
+        
+    Used to store all the necessary elements to analyze or play back a sound. 
+    Only the sound's waveform and fs need to be provided, everything else
+    is derived or has default values.
     """
-    def __init__(self, waveform, fs, nchannels):
+    def __init__(self, waveform, fs, nchannels=1):
         self.fs = fs
         self.waveform = waveform
         self.nchannels = nchannels
@@ -23,7 +38,7 @@ class Sound:
     @property
     def waveform(self):
         return self._waveform
-    # Automatically update n_samples and t whenever waveform changes
+    # Automatically update nsamples and dur whenever waveform changes
     @waveform.setter
     def waveform(self, val):
         self._waveform = val
@@ -33,7 +48,9 @@ class Sound:
 
 class Track:
     """
-    Helpful docstring
+    Class for organizing sequences of y coordinates.
+    
+    TODO -- flesh out this doc string.
     """
     def __init__(self, points):
         self.points = points
@@ -52,7 +69,9 @@ class Track:
         
 class Parameters:
     """
-    Helpful docstring
+    Contains parameters for TrackDraw 2016.
+    
+    TODO -- flesh out this doc string.
     """
     def __init__(self, F0=100,
                        FF=[500, 1500, 2500, 3500, 4500],

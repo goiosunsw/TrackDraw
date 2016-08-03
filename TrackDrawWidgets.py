@@ -15,6 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
 class CanvasGrid(QWidget):
+    """ Stores canvases which display information about current waveform """
     def __init__(self, parent=None):
         super(QWidget, self).__init__(parent)
 
@@ -156,6 +157,16 @@ class trackCanvas(FigureCanvas):
 
 class WaveCanvas(FigureCanvas):
     """
+    Contains waveform reflecting current analyzed/plotted waveform.
+    
+    Arguments:
+        parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
+            is a subclass of QWidget.
+        
+    Attributes: 
+        enabled (boolean) -- if True, wave is plotted.
+        current_waveform (np.array) -- stores most recently plotted waveform.
+        
     WaveCanvas stores the most recently plotted waveform and displays it if
     displayDock.waveCheckBox is checked. Whenever the current display option is
     changed (i.e. whenever displayDock's radio buttons to switch between synth
@@ -164,6 +175,9 @@ class WaveCanvas(FigureCanvas):
     This way, if the user checks waveCheckBox it will display the correct
     waveform even if the waveCheckBox was unchecked when the display option was
     switched.
+    
+    TODO -- replace with more generic subclass of figure canvas, like a generic
+        subclass for non-animated plots? If it's worth it...
     """
     def __init__(self, parent=None):
         self.fig = Figure()
@@ -195,6 +209,28 @@ class WaveCanvas(FigureCanvas):
 
             
 class STFTCanvas(FigureCanvas):
+    """
+    Contains mag. spec. of small snippet of waveform around mouse cursor.
+    
+    Arguments:
+        parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
+            is a subclass of QWidget.
+    
+    Attributes:
+        background -- background stored from copy_from_bbox operation
+        enabled (boolean) -- if True, STFT is plotted.
+        stft (np.array) -- contains most recently plotted STFT
+        stft_size (int) -- size of STFT frame in samples
+        
+    STFTCanvas is updated by the mouse() slot in Slots. A small chunk of the 
+    current displayed/analyzed waveform is grabbed, centered on the current 
+    x_loc of the mouse cursor and the magnitude spectrum of the chunk is 
+    calculated and displayed (if the STFT checkbox is checked). Uses blitting
+    to animate the plot efficiently.
+    
+    TODO -- consider ways to use trackCanvas as parent class, might make things
+        easier and reduce code repetition? 
+    """
     def __init__(self, parent=None):
         self.fig = Figure()
         self.ax  = self.fig.add_subplot(111)
@@ -208,7 +244,6 @@ class STFTCanvas(FigureCanvas):
         self.background = None
         self.enabled = True
         self.stft = None
-        self.current_stft = None
         self.stft_size = DEFAULT_PARAMS.stft_size
         
     def start(self, restart=False):
@@ -260,6 +295,8 @@ class SpecCanvas(trackCanvas):
     plot_specgram(), which accepts data from TrackDraw about how to plot the
     spectrogram and then plots it and calls the right methods to make sure
     tracks are also still plotted. 
+    
+    TODO -- figure out why it's only plotting the first track on startup
     """
     def __init__(self, parent=None):
         trackCanvas.__init__(self, parent=parent)
@@ -333,6 +370,19 @@ class SpecCanvas(trackCanvas):
         
 
 class F0Canvas(trackCanvas):
+    """
+    Contains track representing an F0 contour.
+    
+    Attributes:
+        See trackCanvas' doc string.
+        y_low (int) -- modified from trackCanvas, set to 90 as the lower margin
+            for possible F0.
+        y_high (int) -- modified from trackCavnas, set to 150 as the upper
+            margin for possible F0. 
+            
+    F0Canvas simply changes a handful fo default values from trackCanvas, and
+    otherwise functions as a typical trackCanvas. 
+    """
     def __init__(self, parent=None):
         trackCanvas.__init__(self, parent=parent)
         
@@ -346,6 +396,30 @@ class F0Canvas(trackCanvas):
         
         
 class DisplayDock(QDockWidget):
+    """
+    Contains interface/controls for all main window display parameters.
+    
+    Arguments:
+        parent (?) -- ?
+
+    Attributes:
+        loadedRadioButton (QRadioButton) -- if checked, results in loaded
+            waveform being the one displayed/analyzed/played.
+        synthRadioButton (QRadioButton) -- if checked, results in synthed
+            waveform being the one displayed/analyzed/played.
+        waveCheckBox (QCheckBox) -- if checked, wave_cv is shown.
+        STFTCheckBox (QCheckBox) -- if checked, stft_cv is shown.
+        showFTCheckBox (QCheckBox) -- if checked, formant tracks are shown.
+        clearButton (QButton) -- if pressed, all plots are cleared.
+        track_npointsGroup (SliderGroup) -- slider which allows the number of
+            points in the tracks to vary.
+        
+            
+    DisplayDock stores all user intefaces mechanisms that allow for changing
+    display-related parameters. Most widgets here which are attributes are 
+    attributes so they can be referred to/accessed in main or in 
+    TrackDrawSlots.
+    """
     def __init__(self, parent=None):
         super(DisplayDock, self).__init__(parent)
         self.setWindowTitle("Display settings")
@@ -396,6 +470,38 @@ class DisplayDock(QDockWidget):
 
 
 class AnalysisDock(QDockWidget):
+    """
+    Contains interface/controls for all analysis parameters.
+    
+    Arguments:
+        parent (?) -- ?
+
+    Attributes:
+        methodComboBox (QComboBox) -- combobox which allows the user to select
+            the type of analysis to be performed.
+        specGroup (QGroupBox) -- groupbox containing the user interface for
+            spectrogram parameters.
+        windowComboBox (QComboBox) -- combobox which allows user to select the
+            type of window to use in the spectrogram, part of specGroup.
+        frameSizeGroup (SliderGroup) -- slider which allows user to select the
+            length of the frame to use in the spectrogram, part of specGroup.
+        overlapGroup (SliderGroup) -- slider which allows user to select the
+            amount of overlap in the frames in the spectrogram, part of
+            specGroup.
+        thresholdGroup (SliderGroup) -- slider which allows user to select the
+            amount of thresholding to perform on the magnitude spectra returned
+            by the spectrogram function, part of specGroup.
+        waveletGroup (QGroupBox) -- groupbox containing the user interface for
+            wavelet analysis parameters.
+        applyButton (QButton) -- button which applies any updated analysis.
+            
+    AnalysisDock stores all user intefaces mechanisms that allow for changing
+    analysis-related parameters. Whenever the methodComboBox is changed, the
+    dock displays the appropriate Group associated with the selected synthesis
+    type (i.e. specGroup is displayed if Spectrogram is chosen as the analysis
+    type). Most widgets here which are attributes are attributes so they can
+    be referred to/accessed in main or in TrackDrawSlots.
+    """
     def __init__(self, parent=None):
         super(AnalysisDock, self).__init__(parent)
         self.setWindowTitle("Analysis settings")
@@ -498,6 +604,33 @@ class AnalysisDock(QDockWidget):
 
 
 class SynthesisDock(QDockWidget):
+    """
+    Contains interface/controls for all synthesis parameters.
+    
+    Arguments:
+        parent (?) -- ?
+
+    Attributes:
+        methodComboBox (QComboBox) -- combobox allowing for selection of
+            type of synthesis to be used
+        nformantComboBox (QComboBox) -- combobox allowing for selection of
+            number of formants to be synthesized.
+        klattGroup (QGroupBox) -- groupbox for Klatt synthesizer parameters
+        sineGroup (QGroupBox) -- groupbox for Sine wave synthesizer parameters
+        voicingComboBox (QComboBox) -- part of klattGroup, allows for selection
+            of voicing type (DEPRECATED -- NEED TO REPLACE)
+        FFBandwidthGroup (SliderGroup2) -- group of sliders to allow for
+            selection formant bandwidths to be synthesized.
+        synthButton (QButton) -- button for initiating synthesis using current
+            settings.
+            
+    SynthesisDock stores all user intefaces mechanisms that allow for changing
+    synthesis-related parameters. Whenever the methodComboBox is changed, the
+    dock displays the appropriate Group associated with the selected synthesis
+    type (i.e. klattGroup is displayed if Klatt 1980 is chosen as the synthesis
+    type). Most widgets here which are attributes are attributes so they can
+    be referred to/accessed in main or in TrackDrawSlots.
+    """
     def __init__(self, parent=None):
         super(SynthesisDock, self).__init__(parent)
         self.setWindowTitle("Synthesis settings")
@@ -678,6 +811,9 @@ class SliderGroup2(QWidget):
     A convenience widget for displaying slider information (minimum, maximum,
     and current value). Set stepDouble=True to create a slider that doubles
     its value each step.
+    
+    TODO -- fix slider updates, I think I may have commented out the slider
+    update method because I was having issues with it a while back... 08/03 DG
     """
     def __init__(self, labels, units, mins, maxs, values, stepSizes,
             stepDoubles, parent=None, slots=None):

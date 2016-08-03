@@ -286,6 +286,11 @@ class Slots:
         
     @pyqtSlot()
     def changeSource(self, curr_index, *arg, **kwarg):
+        """ 
+        Changes source type for Klatt syntheiszer
+        
+        DEPRECATED - need to replace
+        """
         if curr_index == 0:
             TDD.CURRENT_PARAMS.voicing = "Full Voicing"
         if curr_index == 1:
@@ -376,7 +381,7 @@ class Slots:
         
         TODO -- convert TrackDraw canvases to a universal subclass of
             FigureCanvas and generalize the functionality of mouse()
-            accordingly. 
+            accordingly. Working on it today and tomorrow - 08/03, DG. 
         """
         event = list(arg)[0]
         x_loc = None
@@ -436,7 +441,7 @@ class Slots:
     @pyqtSlot()
     def mouse_ctrl(self, *arg, **kwarg):
         """
-        DEPRICATED -- to be integrated into mouse() above. 
+        DEPRECATED -- to be integrated into mouse() above. Don't use!
         """
         event = list(arg)[0]
         x_loc = None
@@ -559,7 +564,7 @@ class Slots:
         elements pertaining to the canvases/display. It updates the display 
         in an appropriate way by calling the canvases' start() methods if the
         length of the waveform is 1 (i.e. the waveform is empty) or by calling
-        the canvases' plot_***() methods. 
+        the canvases' plot_***() methods if the waveform contains a sound.
         """
         if len(waveform) == 1:
             self.master.cw.spec_cv.start(TDD.TRACKS)
