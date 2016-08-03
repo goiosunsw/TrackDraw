@@ -65,6 +65,12 @@ class Slots:
     ##### Display slots #####
     @pyqtSlot()
     def clearPlots(self, *arg, **kwarg):
+        """
+        Clears plots.
+        
+        TODO -- what is the point of this slot/button? If there is no replot
+            button, why is there a clear button? 
+        """
         self.master.cw.wave_cv.clear()
         self.master.cw.spec_cv.start(TDD.TRACKS)
         
@@ -80,6 +86,8 @@ class Slots:
     def switchPlots(self, *arg, **kwarg):
         """
         Switches between displaying the loaded or synthed signal.
+        
+        TODO -- seems a little slow... look into profiling it
         """
         waveform, fs, dur = self.getCurrentWaveform()
         self.pushDisplayUpdates(waveform, fs, dur)
@@ -120,6 +128,10 @@ class Slots:
         """
         Changes the number of tracks when nformant combobox is activated.
         
+        Arguments:
+            curr_index (int) -- comes from combobox, indicates how many tracks
+                are to be used. Number of tracks is curr_index + 1.
+                
         changeNoTracks updates spec_cv's nformant and CURRENT_PARAMS's nformant
         and then properly removes or appends Track objects from/to TRACKS. Once
         the nformant variables and TRACKS are properly updated, the current
@@ -171,7 +183,7 @@ class Slots:
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
         """
-        Called whenever a resize occurs, restarts all plots.
+        Called whenever a resize of the main window occurs, restarts all plots.
         
         On any resize of the main window, the current displayed waveform is
         grabbed and sent to the pushDisplayUpdates function, which restarts
@@ -196,6 +208,21 @@ class Slots:
        
     @pyqtSlot()
     def changeWindow(self, curr_index, *arg, **kwarg):
+        """
+        Changes the window type to be used by the spectrogram.
+        
+        Arguments:
+            curr_index (int) -- comes from the combobox, indicates which window
+                is to be used. 
+        
+        Whenever the window type combobox is used, the window_type attribute of
+        CURRENT_PARAMS is updated accordingly.
+        
+        TODO -- is there a better way to do this? Maybe we could use the text
+            of the current index so that at least we can be sure we're 
+            setting the right window? Or actually store the windows as data
+            in the combobox?
+        """
         if curr_index == 0:
             TDD.CURRENT_PARAMS.window_type = np.hamming
         if curr_index == 1:
@@ -205,16 +232,19 @@ class Slots:
                         
     @pyqtSlot()
     def changeFrameSize(self, *arg, **kwarg):
+        """ Change spectrogram frame size. """
         TDD.CURRENT_PARAMS.window_len =\
                 self.master.analysisDock.frameSizeGroup.currValue
                
     @pyqtSlot()
     def changeOverlap(self, *arg, **kwarg):
+        """ Change percent of overlap in spectrogram frames. """
         TDD.CURRENT_PARAMS.noverlap =\
                 self.master.analysisDock.overlapGroup.currValue*0.01
         
     @pyqtSlot()
     def changeSTFTSize(self, *arg, **kwarg):
+        """ Change size of frame for STFT display. """
         # Need to update both TDD and stft_cv's stftSize
         TDD.CURRENT_PARAMS.stft_size =\
                 self.master.analysisDock.stftSizeGroup.currValue
@@ -227,6 +257,21 @@ class Slots:
     ##### Synthesis slots #####
     @pyqtSlot()
     def changeSynth(self, curr_index, *arg, **kwarg):
+        """
+        Change which synth is to be used by synthesize(). 
+        
+        Arguments:
+            curr_index (int) -- comes from the combobox, indicates which synth
+                is to be used.
+                
+        Whenever the synth type combobox is used, the synth_type attribute of
+        CURRENT_PARAMS is updated accordingly.
+        
+        TODO -- is there a better way to do this? Maybe we could use the text
+            of the current index so that at least we can be sure we're 
+            setting the right synth? Or actually store the synths as data
+            in the combobox?
+        """
         if curr_index == 0:
             TDD.CURRENT_PARAMS.synth_type = "Klatt 1980"
         if curr_index == 1:
@@ -234,6 +279,7 @@ class Slots:
             
     @pyqtSlot()
     def changeBW(self, *arg, **kwarg):
+        """ Updates formant bandwidth values when sliders are used. """
         for i in range(5):
             TDD.CURRENT_PARAMS.BW[i] =\
                  self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
@@ -263,7 +309,7 @@ class Slots:
                                           TDD.CURRENT_PARAMS.nformant])
         for i in range(TDD.CURRENT_PARAMS.nformant):
             TDD.CURRENT_PARAMS.FF[:,i] = TDD.TRACKS[i].points
-        if TDD.LOADED_SOUND.dur < 0.05:
+        if TDD.LOADED_SOUND.dur < 0.05: # random catch-all value
             TDD.CURRENT_PARAMS.dur = 1
         else:
             TDD.CURRENT_PARAMS.dur = TDD.LOADED_SOUND.dur
@@ -290,6 +336,17 @@ class Slots:
         """
         Performs TRACKS, F0_TRACK, or stft updates depending on canvas activity
         
+        Arguments:
+            event (PyQt Event) -- passed as default index 0 argument in *arg.
+            plots (TrackDraw Canvas object) -- passed as "plot" in **kwarg,
+                plot to be manipulated by mouse().
+            target (string) -- passed as "target" in **kwarg, used to provide
+                conditional functionality in mouse() based on whether one is
+                manipulating the f0_cv or the spec_cv.
+            wasClick (boolean) -- passed as "wasClick" in **kwarg, used to 
+                provide different functionality based on whether current mouse
+                action was a single click or a mouse drag movement.
+            
         Whenever spec_cv or f0_cv record mouse activity, this slot handles that
         activity. If the mouse button is clicked on the spec_cv, the nearest
         vertex to the mouse is found and updated to the mouse's location in the
@@ -316,6 +373,10 @@ class Slots:
         the displayed signal. Then, if an stft around that location is possible
         (i.e. if an stft has room to be calculated) it is calculated, converted
         to log scale, and passed to stft_cv via stft_cv's update_stft method.
+        
+        TODO -- convert TrackDraw canvases to a universal subclass of
+            FigureCanvas and generalize the functionality of mouse()
+            accordingly. 
         """
         event = list(arg)[0]
         x_loc = None
@@ -374,6 +435,9 @@ class Slots:
         
     @pyqtSlot()
     def mouse_ctrl(self, *arg, **kwarg):
+        """
+        DEPRICATED -- to be integrated into mouse() above. 
+        """
         event = list(arg)[0]
         x_loc = None
         y_loc = None
@@ -447,6 +511,7 @@ class Slots:
     ##### Playback slots #####
     @pyqtSlot()
     def play(self):
+        """ Plays current displayed waveform after normalizing it. """
         waveform, fs, dur = self.getCurrentWaveform()
         waveform = waveform/np.max(np.abs(waveform))*0.9
         sd.play(waveform, fs)
@@ -481,6 +546,14 @@ class Slots:
     def pushDisplayUpdates(self, waveform, fs, dur):
         """
         Updates all canvases to reflect any parameter changes.
+        
+        Arguments:
+            waveform (np.array) -- current displayed waveform, usually grabbed
+                by getCurrentWaveform() function.
+            fs (int) -- sampling rate in Hz of current displayed waveform, 
+                usually grabbed by getCurrentwavform() function.
+            dur (float) -- duration in seconds of current displayed waveform, 
+                usually grabbed in getCurrentWaveform() function. 
         
         This is a utility function called by various slots whenever they change
         elements pertaining to the canvases/display. It updates the display 
