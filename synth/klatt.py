@@ -25,6 +25,8 @@
     The Journal Of The Acoustical Society Of America, 67(3), 971. 
     http://dx.doi.org/10.1121/1.383940
 """
+import math
+
 def klatt_make(parms):
     """
     Extracts necessary parameters from TrackDraw 2016 Parameters object.
@@ -41,12 +43,11 @@ def klatt_make(parms):
     bw = parms.BW
     fs = parms.synth_fs
     dur = parms.dur
-    env = parms.ENV
     source = parms.voicing
-    y = klatt_bridge(f0, ff, bw, fs, dur, env, source)
+    y = klatt_bridge(f0, ff, bw, fs, dur, source)
     return(y)
     
-def klatt_bridge(f0, ff, bw, fs, dur, env, source, inv_samp=50):
+def klatt_bridge(f0, ff, bw, fs, dur, source, inv_samp=50):
     """
     Processes/interpolates input parameters for Klatt synth, runs synth.
     
@@ -87,7 +88,6 @@ def klatt_bridge(f0, ff, bw, fs, dur, env, source, inv_samp=50):
     interp_f0 = []
     interp_ff = []
     interp_bw = []
-    interp_env = []
     interp_f0 = interpolate(f0, n_inv)
     for i in range(n_form):
             interp_ff.append(interpolate(ff[:,i], n_inv))
@@ -95,11 +95,9 @@ def klatt_bridge(f0, ff, bw, fs, dur, env, source, inv_samp=50):
                 interp_bw.append(interpolate(bw[:,i], n_inv))
             except IndexError:
                 interp_bw.append(interpolate(bw[i], n_inv))
-    interp_env = interpolate(env, n_inv)
     # Finally, create synth object, run it, and return its output waveform    
     synth = Klatt_Synth(f0=interp_f0, ff=interp_ff, bw=interp_bw,
-                        env=interp_env, fs=fs, n_inv=n_inv, n_form=n_form,
-                        inv_samp=inv_samp, source=source)
+                        fs=fs, n_inv=n_inv, n_form=n_form, inv_samp=inv_samp)
     synth.synth()
     return(synth.output)
     
@@ -112,14 +110,12 @@ class Klatt_Synth:
         f0 (list, len n_inv) -- fundamental frequency contour
         ff (lists, n_form, len n_inv) -- formant frequency contours
         bw (lists, n_form, len n_inv) -- bandwidth contours
-        env -- DEPRICATED, TODO - remove
         fs (integer) -- sample rate in Hz
         n_inv (integer) -- number of intervals of length inv_samp samples to be
             synthesized.
         n_form (integer) -- number of formants to be synthesized (integer).
             Cannot vary over the duration of the synthesized vowel.
         inv_samp (integer) -- length of each interval in samples
-        source -- DEPRICATED, TODO - remove
     
     To generate a waveform from a Klatt_Synth object using the parameters
     provided to it, call its synth() method.
@@ -156,19 +152,29 @@ class Klatt_Synth:
     TODO -- Add other sections (noise source and parallel branch)
     TODO -- Optimize
     """
-    def __init__(self, f0, ff, bw, env, fs, n_inv, n_form, inv_samp, source):
+    def __init__(self, f0, ff, bw, fs, n_inv, n_form, inv_samp,
+                 av=0, af=0, ah=0, avs=0, fgp=0, bgp=100, fgz=1500, bgz=6000,
+                 bgs=200):
         # Initialize time-varying synthesis parameters
         self.f0 = f0
         self.ff = ff
         self.bw = bw
-        self.fs = fs
-        self.env = env
-        self.dt = 1/self.fs
+        self.av = [av]*n_inv
+        self.af = [af]*n_inv
+        self.ah = [ah]*n_inv
+        self.avs = [avs]*n_inv
+        self.fgp = [fgp]*n_inv
+        self.bgp = [bgp]*n_inv
+        self.fgz = [fgz]*n_inv
+        self.bgz = [bgz]*n_inv
+        self.bgs = [bgs]*n_inv
         
         # Initialize non-time-varying synthesis parameters 
         self.inv_samp = inv_samp
         self.n_inv = n_inv
         self.n_form = n_form
+        self.fs = fs
+        self.dt = 1/self.fs
         
         # Initialize trackers
         self.last_glot_pulse = 0
@@ -252,11 +258,14 @@ class Klatt_Voice(Klatt_Section):
         
     def run(self):
         self.impulse.impulse_gen()
-        self.rgp.resonate(ff=0, bw=100)
-        self.rgz.resonate(ff=1500, bw=6500)
-        self.av.amplify(dB=0)
-        self.rgs.resonate(ff=0, bw=200)
-        self.avs.amplify(dB=-40) # current dB @ -40 essentially disables it
+        self.rgp.resonate(ff=self.master.fgp[self.master.current_inv],
+                          bw=self.master.bgp[self.master.current_inv])
+        self.rgz.resonate(ff=self.master.fgz[self.master.current_inv],
+                          bw=self.master.bgz[self.master.current_inv])
+        self.av.amplify(dB=self.master.av[self.master.current_inv])
+        self.rgs.resonate(ff=self.master.fgp[self.master.current_inv],
+                          bw=self.master.bgs[self.master.current_inv])
+        self.avs.amplify(dB=self.master.av[self.master.current_inv]) # current dB @ -40 essentially disables it
         self.mixer.mix()
         self.output[:] = self.mixer.output[:]
         
@@ -363,7 +372,6 @@ class Resonator(Klatt_Component):
             anti (boolean) -- if True, will calculate coefficients for
                 antiresonator
         """
-        import math
         c = -math.exp(-2*math.pi*bw*self.master.dt)
         b = (2*math.exp(-math.pi*bw*self.master.dt)\
              *math.cos(2*math.pi*ff*self.master.dt))
@@ -421,7 +429,11 @@ class Amplifier(Klatt_Component):
 
 class Mixer(Klatt_Component):
     """
-    Simple mixer. 
+    Simple mixer. Supports up to 2 channels.
+    
+    TODO -- fix to support n channels, not sure why my previous attempt didn't 
+        work but this is the night's quick fix. Much faster than the older code
+        though. 08/01, DG
     """
     def __init__(self, master, input_connect=None):
         Klatt_Component.__init__(self, master, input_connect)
@@ -431,13 +443,12 @@ class Mixer(Klatt_Component):
         Similar operation to Klatt_Component.pull() but mixes multiple inputs
         together. 
         """
-        for n in range(self.master.inv_samp):
-            temp = []
-            for j in range(len(self.input_connect)):
-                temp.append(self.input_connect[j].output[n])
-            self.input[n] = sum(temp)
-        self.output[:] = self.input[:]
-
+        if len(self.input_connect) == 1:
+            self.output[:] = self.input_connect[0].output[:]
+        if len(self.input_connect) == 2:
+            self.output[:] = [sum(x) for x in zip(self.input_connect[0].output,
+                        self.input_connect[1].output)][:]
+                        
 
 class Rad_Char(Klatt_Component):
     """
