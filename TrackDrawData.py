@@ -98,6 +98,6 @@ SYNTH_SOUND  = Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
 npoints = DEFAULT_PARAMS.track_npoints
 F0 = DEFAULT_PARAMS.F0
 allFF = DEFAULT_PARAMS.FF
-F0_TRACK =  Track(F0*np.ones([npoints]))
+F0_TRACK =  [Track(F0*np.ones([npoints]))]
 TRACKS   = [Track(FF*np.ones([npoints])) for FF in allFF]
 

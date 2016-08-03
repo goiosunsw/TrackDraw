@@ -176,7 +176,7 @@ class Slots:
         self.master.cw.f0_cv.track_npoints = new_track_npoints
         for i in range(len(TDD.TRACKS)):
             TDD.TRACKS[i].changeNoPoints(new_track_npoints)
-        TDD.F0_TRACK.changeNoPoints(new_track_npoints)
+        TDD.F0_TRACK[0].changeNoPoints(new_track_npoints)
         waveform, fs, dur = self.getCurrentWaveform()  
         self.pushDisplayUpdates(waveform, fs, dur)
             
@@ -304,7 +304,7 @@ class Slots:
         accordingly. Then, if the synth radio button is checked, the changes
         to the waveform are reflected in the display.
         """
-        TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK.points
+        TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK[0].points
         TDD.CURRENT_PARAMS.FF = np.zeros([TDD.CURRENT_PARAMS.track_npoints,
                                           TDD.CURRENT_PARAMS.nformant])
         for i in range(TDD.CURRENT_PARAMS.nformant):
@@ -391,8 +391,8 @@ class Slots:
                 dist_to_x_pts = np.abs(np.linspace(0,TDD.CURRENT_PARAMS.track_npoints-1,TDD.CURRENT_PARAMS.track_npoints) - x_loc)
                 nearest_x_idx = dist_to_x_pts.argmin()
                 if target == "F0":
-                    TDD.F0_TRACK.points[nearest_x_idx] = y_loc
-                    plot.update_track(TDD.F0_TRACK.points)
+                    TDD.F0_TRACK[0].points[nearest_x_idx] = y_loc
+                    plot.updateCanvas(TDD.F0_TRACK[0].points, trackNo=0)
                 elif target == "FF":
                     if wasClick == True:
                         y_coords_at_nearest_x = np.array([track.points[nearest_x_idx] for track in TDD.TRACKS])
@@ -453,8 +453,8 @@ class Slots:
                 if target == "F0":
                     if wasClick == True:
                         plot.locked_point = nearest_x_idx
-                        TDD.F0_TRACK.points[nearest_x_idx] = y_loc
-                        plot.update_track(TDD.F0_TRACK.points)
+                        TDD.F0_TRACK[0].points[nearest_x_idx] = y_loc
+                        plot.update_track(TDD.F0_TRACK[0].points)
                     elif wasClick == False:
                         if plot.locked_point == nearest_x_idx:
                             TDD.F0_TRACK.points[nearest_x_idx] = y_loc

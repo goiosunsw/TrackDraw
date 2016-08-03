@@ -78,14 +78,14 @@ class tdCanvas(FigureCanvas):
         self.ax.clear()
         self.tracks = []
         self.ax.set_xlim(0, self.track_npoints - 1)
-        self.ax.set_ylim(0, self.y_high)
+        self.ax.set_ylim(self.y_low, self.y_high)
         self.fig.canvas.draw()
         self.getBackground()
         for i in range(len(tracks)):
             self.tracks.append(self.ax.plot(tracks[i].points, color="blue",
                                           marker="o"))
         self.ax.set_xlim(0, self.track_npoints - 1)
-        self.ax.set_ylim(0, self.y_high)
+        self.ax.set_ylim(self.y_low, self.y_high)
         self.updateCanvas(redraw=True)
         
     def mouse(self, event):
@@ -97,7 +97,7 @@ class tdCanvas(FigureCanvas):
         
     def updateCanvas(self, new_track=0, trackNo=0, redraw=False):
         self.ax.set_xlim(0, self.track_npoints - 1)
-        self.ax.set_ylim(0, self.y_high)
+        self.ax.set_ylim(self.y_low, self.y_high)
         self.fig.canvas.restore_region(self.background)
         if redraw == False:
             self.tracks[trackNo][0].set_ydata(new_track)
@@ -238,44 +238,17 @@ class SpecCanvas(tdCanvas):
             self.updateCanvas(redraw=True)            
         
 
-class F0Canvas(FigureCanvas):
+class F0Canvas(tdCanvas):
     def __init__(self, parent=None):
-        self.fig = Figure()
-        self.ax  = self.fig.add_subplot(111)
-        self.ax.hold(False)
+        tdCanvas.__init__(self, parent=parent)
+        
+        # Set F0Canvas unique plot settings
         self.ax.xaxis.set_visible(False)
         self.fig.subplots_adjust(left=0.08, right=0.95) 
-        FigureCanvas.__init__(self, self.fig)
-        self.setParent(parent)
         
-        self.f0_track = None
-        self.background = None
-        self.track_npoints = DEFAULT_PARAMS.track_npoints
-        
-    def start(self, track):
-        self.ax.clear()
-        self.f0_track = []
-        self.ax.set_xlim(0, self.track_npoints-1)
-        self.ax.set_ylim(90, 150)
-        self.fig.canvas.draw()
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-        self.f0_track = self.ax.plot(track.points, color="blue", marker="o")
-        self.ax.set_xlim(0, self.track_npoints-1)
-        self.ax.set_ylim(90, 150)
-        self.fig.canvas.draw()
-        
-    def mouse(self, event):
-        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
-        xmin, xmax = self.ax.get_xlim()
-        ymin, ymax = self.ax.get_ylim()
-        if xmin < x_loc < xmax and ymin < y_loc < ymax:
-            return(x_loc, y_loc)
-        
-    def update_track(self, new_track):
-        self.fig.canvas.restore_region(self.background)
-        self.f0_track[0].set_ydata(new_track)
-        self.ax.draw_artist(self.f0_track[0])
-        self.fig.canvas.blit(self.ax.clipbox)
+        # Initialize F0Canvas unique attributes, or adjust defaults
+        self.y_low = 90
+        self.y_high = 150
         
         
 class DisplayDock(QDockWidget):
