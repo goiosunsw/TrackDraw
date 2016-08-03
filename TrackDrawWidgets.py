@@ -44,9 +44,11 @@ class CanvasGrid(QWidget):
         self.current_waveform = None
         self.current_fs = None
         
-class tdCanvas(FigureCanvas):
+class trackCanvas(FigureCanvas):
     """
-    tdCanvas is a subclass of FigureCanvas to be used for all TrackDraw
+    Canvas object for animated canvases in TrackDraw 2016.
+    
+    trackCanvas is a subclass of FigureCanvas to be used for all TrackDraw
     animated plots which display tracks. 
     """    
     def __init__(self, parent=None):
@@ -189,9 +191,9 @@ class STFTCanvas(FigureCanvas):
             pass
 
             
-class SpecCanvas(tdCanvas):
+class SpecCanvas(trackCanvas):
     def __init__(self, parent=None):
-        tdCanvas.__init__(self, parent=parent)
+        trackCanvas.__init__(self, parent=parent)
         
         # Set SpecCanvas unique plot settings
         self.ax.set_xlabel("Time [s]")
@@ -210,7 +212,6 @@ class SpecCanvas(tdCanvas):
         """
         Plots spectrogram on spec_cv
         
-        TODO -- reorganize function, clear up ambiguous operation, etc.
         TODO -- look into automatic zero-padding to fix scaling issues?
         TODO -- condense restart branches into one set of code
         """
@@ -238,9 +239,9 @@ class SpecCanvas(tdCanvas):
             self.updateCanvas(redraw=True)            
         
 
-class F0Canvas(tdCanvas):
+class F0Canvas(trackCanvas):
     def __init__(self, parent=None):
-        tdCanvas.__init__(self, parent=parent)
+        trackCanvas.__init__(self, parent=parent)
         
         # Set F0Canvas unique plot settings
         self.ax.xaxis.set_visible(False)
