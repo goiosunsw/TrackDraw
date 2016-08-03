@@ -80,7 +80,7 @@ class Slots:
             self.master.cw.spec_cv.enabled = False
         else:
             self.master.cw.spec_cv.enabled = True
-        self.master.cw.spec_cv.update_track(redraw=1)        
+        self.master.cw.spec_cv.updateCanvas(redraw=1)        
         
     @pyqtSlot()
     def switchPlots(self, *arg, **kwarg):
@@ -319,13 +319,13 @@ class Slots:
         elif TDD.CURRENT_PARAMS.synth_type == "Sine wave":
             TDD.SYNTH_SOUND.waveform = synth.sine.sine_make(TDD.CURRENT_PARAMS)
         if self.master.displayDock.synthedRadioButton.isChecked():
-            self.master.cw.spec_cv.plot_specgram(TDD.SYNTH_SOUND.dur,
-                                                 TDD.SYNTH_SOUND.waveform,
-                                                 TDD.SYNTH_SOUND.fs,
-                                                 TDD.CURRENT_PARAMS.window_len,
-                                                 TDD.CURRENT_PARAMS.noverlap,
-                                                 TDD.CURRENT_PARAMS.window_type,
-                                                 TDD.TRACKS)
+            self.master.cw.spec_cv.plot_specgram(x_right=TDD.SYNTH_SOUND.dur,
+                                                 waveform=TDD.SYNTH_SOUND.waveform,
+                                                 fs=TDD.SYNTH_SOUND.fs,
+                                                 window_len=TDD.CURRENT_PARAMS.window_len,
+                                                 noverlap=TDD.CURRENT_PARAMS.noverlap,
+                                                 window_type=TDD.CURRENT_PARAMS.window_type,
+                                                 tracks=TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(TDD.SYNTH_SOUND.waveform)
     ##### End synthesis slots #####    
     
@@ -399,11 +399,11 @@ class Slots:
                         dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
                         trackNo = dist_to_y_pts.argmin()
                         TDD.TRACKS[trackNo].points[nearest_x_idx] = y_loc
-                        plot.update_track(TDD.TRACKS[trackNo].points, trackNo)
+                        plot.updateCanvas(TDD.TRACKS[trackNo].points, trackNo)
                         plot.locked_track = trackNo
                     elif wasClick == False:
                         TDD.TRACKS[plot.locked_track].points[nearest_x_idx] = y_loc
-                        plot.update_track(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
+                        plot.updateCanvas(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
             except TypeError:
                 pass
         else:

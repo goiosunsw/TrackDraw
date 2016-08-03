@@ -44,6 +44,68 @@ class CanvasGrid(QWidget):
         self.current_waveform = None
         self.current_fs = None
         
+class tdCanvas(FigureCanvas):
+    """
+    tdCanvas is a subclass of FigureCanvas to be used for all TrackDraw
+    animated plots which display tracks. 
+    """    
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot(111)
+        self.ax.hold(False)
+        FigureCanvas.__init__(self, self.fig)
+        self.setParent(parent)
+        
+        self.enabled = True
+        self.background = None
+        self.tracks = []
+        self.current_tracks = []
+        self.x_low = 0
+        self.x_high = 0
+        self.y_low = 0
+        self.y_high = 0
+        self.track_npoints = DEFAULT_PARAMS.track_npoints
+        self.locked_track = 0
+        
+    def clear(self):
+        self.ax.clear()
+        self.fig.canvas.draw()
+        
+    def getBackground(self):
+        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
+        
+    def start(self, tracks):
+        self.ax.clear()
+        self.tracks = []
+        self.ax.set_xlim(0, self.track_npoints - 1)
+        self.ax.set_ylim(0, self.y_high)
+        self.fig.canvas.draw()
+        self.getBackground()
+        for i in range(len(tracks)):
+            self.tracks.append(self.ax.plot(tracks[i].points, color="blue",
+                                          marker="o"))
+        self.ax.set_xlim(0, self.track_npoints - 1)
+        self.ax.set_ylim(0, self.y_high)
+        self.updateCanvas(redraw=True)
+        
+    def mouse(self, event):
+        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
+        x_min, x_max = self.ax.get_xlim()
+        y_min, y_max = self.ax.get_ylim()
+        if x_min < x_loc < x_max and y_min < y_loc < y_max:
+            return(x_loc, y_loc)
+        
+    def updateCanvas(self, new_track=0, trackNo=0, redraw=False):
+        self.ax.set_xlim(0, self.track_npoints - 1)
+        self.ax.set_ylim(0, self.y_high)
+        self.fig.canvas.restore_region(self.background)
+        if redraw == False:
+            self.tracks[trackNo][0].set_ydata(new_track)
+        if self.enabled:
+            for i in range(len(self.tracks)):
+                self.ax.draw_artist(self.tracks[i][0])
+        self.fig.canvas.blit(self.ax.clipbox)
+        
 
 class WaveCanvas(FigureCanvas):
     """
@@ -127,83 +189,20 @@ class STFTCanvas(FigureCanvas):
             pass
 
             
-class SpecCanvas(FigureCanvas):
+class SpecCanvas(tdCanvas):
     def __init__(self, parent=None):
-        self.fig = Figure()
-        self.ax  = self.fig.add_subplot(111)
+        tdCanvas.__init__(self, parent=parent)
+        
+        # Set SpecCanvas unique plot settings
         self.ax.set_xlabel("Time [s]")
         self.ax.set_ylabel("Frequency [Hz]")
         self.fig.subplots_adjust(left=0.08, top=0.95, right=0.95, bottom=0.1)
-        FigureCanvas.__init__(self, self.fig)
-        self.setParent(parent)
         
-        self.tracks = []
-        self.background = None
-        self.nformant = 5
-        self.track_npoints = DEFAULT_PARAMS.track_npoints
-        self.locked_track = 0
-        self.enabled = True
+        # Initialize SpecCanvas unique attributes, or adjust defaults
         self.current_waveform = None
         self.current_fs = None
-        self.current_dur = None
-        self.locked_point = 0
-        
-    def start(self, tracks):
-        """
-        Starts the spec_cv.
-        
-        Clears spec_cv, removes tracks, sets limits, draws canvas, grabs background,
-        draws tracks, draws canvas.
-        """
-        self.ax.clear()
-        self.tracks = []
-        self.ax.set_xlim(0, self.track_npoints-1)
-        self.ax.set_ylim(0, 5000)
-        self.fig.canvas.draw()
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-        for i in range(self.nformant):
-            self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
-        self.ax.set_xlim(0, self.track_npoints-1)
-        self.ax.set_ylim(0, 5000)
-        self.fig.canvas.draw()
-        
-    def mouse(self, event):
-        """
-        Converts mouse location to data coordinates and returns if in range.
-        
-        Converts event.x and event.y to data coordinates using self.ax's 
-        transform methods. If the mouse is within the limits of the plot, the
-        values are returned.
-        """
-        x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
-        xmin, xmax = self.ax.get_xlim()
-        ymin, ymax = self.ax.get_ylim()
-        if xmin < x_loc < xmax and ymin < y_loc < ymax:
-            return(x_loc, y_loc)
-        
-    def update_track(self, new_track=0, trackNo=0, redraw=0):
-        """
-        Animates tracks.
-        
-        Accepts new_track data and trackNo. Restores the background, sets the
-        trackNo-th track data to new_track, draws all tracks, and then blits
-        axis clipbox. If redraw = 1, it does the same thing but without
-        updating any track data
-        """
-        if redraw == 0:
-            self.ax.set_xlim(0, self.track_npoints-1)
-            self.fig.canvas.restore_region(self.background)
-            self.tracks[trackNo][0].set_ydata(new_track)
-            for i in range(self.nformant):
-                self.ax.draw_artist(self.tracks[i][0])
-            self.fig.canvas.blit(self.ax.clipbox)
-        else:
-            self.ax.set_xlim(0, self.track_npoints-1)
-            self.fig.canvas.restore_region(self.background)
-            if self.enabled:
-                for i in range(self.nformant):
-                    self.ax.draw_artist(self.tracks[i][0])
-            self.fig.canvas.blit(self.ax.clipbox)
+        self.y_high = DEFAULT_PARAMS.synth_fs/2
+        self.nformant = DEFAULT_PARAMS.nformant
         
     def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, 
                       noverlap=0.5, window_type=np.hanning, tracks=0, 
@@ -211,32 +210,32 @@ class SpecCanvas(FigureCanvas):
         """
         Plots spectrogram on spec_cv
         
-        TODO - reorganize function, clear up ambiguous operation, etc.
+        TODO -- reorganize function, clear up ambiguous operation, etc.
+        TODO -- look into automatic zero-padding to fix scaling issues?
+        TODO -- condense restart branches into one set of code
         """
         if restart == False:
             self.current_waveform = waveform
             self.current_fs = fs
-            self.current_x_right = x_right
+            self.y_high = fs/2
             self.ax.clear()
             self.tracks = []
-            self.ax.set_xlim(0, x_right)
             self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
                              noverlap=int(window_len*noverlap), window=window_type(window_len), 
                              cmap=plt.cm.gist_heat)
             self.fig.canvas.draw()
-            self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-            for i in range(self.nformant):
+            self.getBackground()
+            for i in range(len(tracks)):
                 self.tracks.append(self.ax.plot(tracks[i].points, color="blue", marker="o"))
-            self.update_track(redraw=1)
+            self.updateCanvas(redraw=True)
         elif restart == True:
             self.ax.clear()
-            self.ax.set_xlim(0, self.current_x_right)
             self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
                              noverlap=int(window_len*noverlap), window=window_type(window_len), 
                              cmap=plt.cm.gist_heat)
             self.fig.canvas.draw()
             self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-            self.update_track(redraw=1)            
+            self.updateCanvas(redraw=True)            
         
 
 class F0Canvas(FigureCanvas):
@@ -252,7 +251,6 @@ class F0Canvas(FigureCanvas):
         self.f0_track = None
         self.background = None
         self.track_npoints = DEFAULT_PARAMS.track_npoints
-        self.locked_point = 0
         
     def start(self, track):
         self.ax.clear()

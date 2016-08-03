@@ -186,8 +186,6 @@ def main():
     mainWindow = MainWindow()
     mainWindow.show()
     # Have to start canvasses here, otherwise they're the wrong size!!
-    # We may want to consider renaming them to something easier to use,
-    # but I'm not sure where they're referenced... DG 07/26
     mainWindow.cw.spec_cv.start(TDD.TRACKS)
     mainWindow.cw.f0_cv.start(TDD.F0_TRACK)
     mainWindow.cw.stft_cv.start()
