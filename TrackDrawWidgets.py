@@ -48,8 +48,28 @@ class trackCanvas(FigureCanvas):
     """
     Canvas object for animated canvases in TrackDraw 2016.
     
+    Arguments:
+        parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
+            is a subclass of QWidget
+    
+    Attributes:
+        enabled (boolean) -- if True, tracks will be drawn. If not, they will
+            still be properly stored, but will not be drawn.
+        background -- background stored from copy_from_bbox operation
+        tracks (list) -- contains canvas' current Line2D objects, which
+            represent tracks.
+        x_low (float) -- lower limit of plot in x-dimension
+        x_high (float) -- upper limit of plot in x-dimension
+        y_low (float) -- lower limit of plot in y-dimension
+        y_high (float) -- upper limit of plot in y-dimension
+        track_npoints (int) -- number of points in tracks
+        locked_track (int) -- current locked track
+        
     trackCanvas is a subclass of FigureCanvas to be used for all TrackDraw
-    animated plots which display tracks. 
+    animated plots which display tracks. This will allow for easy creation
+    of other similar canvas objects to allow for animated graphical input of
+    parameters. Currently, only F0Canvas and SpecCanvas use this as a parent
+    class.
     """    
     def __init__(self, parent=None):
         self.fig = Figure()
@@ -61,7 +81,6 @@ class trackCanvas(FigureCanvas):
         self.enabled = True
         self.background = None
         self.tracks = []
-        self.current_tracks = []
         self.x_low = 0
         self.x_high = 0
         self.y_low = 0
@@ -74,9 +93,18 @@ class trackCanvas(FigureCanvas):
         self.fig.canvas.draw()
         
     def getBackground(self):
+        """ Grabs current background. """
         self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
         
     def start(self, tracks):
+        """ 
+        Starts tracks. 
+        
+        Arguments:
+            tracks (list) -- list of TrackDrawData.Track objects.
+            
+        Used whenever canvas is initialized.
+        """
         self.ax.clear()
         self.tracks = []
         self.ax.set_xlim(0, self.track_npoints - 1)
@@ -91,13 +119,30 @@ class trackCanvas(FigureCanvas):
         self.updateCanvas(redraw=True)
         
     def mouse(self, event):
+        """ Converts mouse coordinates in pixels to data coordinates. """
         x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
         x_min, x_max = self.ax.get_xlim()
         y_min, y_max = self.ax.get_ylim()
+        # Only return if within plot limits
         if x_min < x_loc < x_max and y_min < y_loc < y_max:
             return(x_loc, y_loc)
         
     def updateCanvas(self, new_track=0, trackNo=0, redraw=False):
+        """
+        Animates canvas.
+        
+        Arguments:
+            new_track (np.array) -- array of new y coordinates for track to be
+                updated.
+            trackNo (int) -- index of track to be updated
+            redraw (boolean) -- if True, does not use new_track and trackNo
+                arguments to change a track.
+        
+        First, the current background is restored. Then, if redraw is False,
+        the trackNo-th track's y_data is changed to match the data found in 
+        new_track. If self.enabled is True, the tracks are drawn. Finally, 
+        the axes' clipbox is blitted to animate changes. 
+        """
         self.ax.set_xlim(0, self.track_npoints - 1)
         self.ax.set_ylim(self.y_low, self.y_high)
         self.fig.canvas.restore_region(self.background)
@@ -192,6 +237,30 @@ class STFTCanvas(FigureCanvas):
 
             
 class SpecCanvas(trackCanvas):
+    """
+    Contains tracks reflecting formant frequencies and plots spectrograms.
+    
+    Arguments:
+        See trackCanvas's doc string.
+        
+    Attributes:
+        See trackCanvas's doc string.
+        current_waveform (np.array) -- waveform corresponding to the most
+            recently plotted waveform.
+        current_fs (int) -- sampling rate in Hz corresponding to the most
+            recently plotted waveform.
+        y_high (int) -- modified from trackCanvas defaults, set as f/2 since
+            spectrogram is to be plotted.
+        nformant (int) -- just keeps track of current number of formants to be
+            reflected in tracks. May be best to replace its functionality, need
+            to change references to it in Slots. 
+            
+    SpecCanvas adds a number of attributes (and changes one default attribute)
+    from its parent class, trackCanvas. It also adds a new method,
+    plot_specgram(), which accepts data from TrackDraw about how to plot the
+    spectrogram and then plots it and calls the right methods to make sure
+    tracks are also still plotted. 
+    """
     def __init__(self, parent=None):
         trackCanvas.__init__(self, parent=parent)
         
@@ -212,8 +281,32 @@ class SpecCanvas(trackCanvas):
         """
         Plots spectrogram on spec_cv
         
+        Arguments:
+            x_right (float) -- right limit in x-dimension, usually set to
+                analyzed waveform's duration
+            waveform (np.array) -- waveform to be analyzed in spectrogram
+            fs (int) -- sampling rate in Hz
+            window_len (int) -- length of window to be used in samples
+            noverlap (int) -- proportion overlap to be used for windows
+            window_type (window function) -- some type of window function from
+                numpy.
+            tracks (list) -- list of TrackDrawData.Track objects, used to
+                redraw tracks after spectrogram is plotted.
+            restart (boolean) -- if False, creates spectrogram based on input
+                waveform/fs/duration/etc., if True, creates spectrogram based
+                on previously used waveform/fs/duration/etc. cached from last
+                call in current_waveform, current_fs
+        
+        plot_specgram() handles the task of plotting a spectrogram to the
+        specCanvas based on input waveform/fs data or based on cached 
+        waveform/fs data from the most recent call to plot_specgram(). The axes
+        are temporarily set to values appropriate for the spectrogram, then the
+        new background (containing the plotted spectrogram) is grabbed and axes
+        are restored to a scale appropriate for all Track related features.
+        
         TODO -- look into automatic zero-padding to fix scaling issues?
         TODO -- condense restart branches into one set of code
+        TODO -- implement more clear system for setting limits and duration...
         """
         if restart == False:
             self.current_waveform = waveform
