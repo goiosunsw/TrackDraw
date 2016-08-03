@@ -146,6 +146,7 @@ class SpecCanvas(FigureCanvas):
         self.current_waveform = None
         self.current_fs = None
         self.current_dur = None
+        self.locked_point = 0
         
     def start(self, tracks):
         """
@@ -251,6 +252,7 @@ class F0Canvas(FigureCanvas):
         self.f0_track = None
         self.background = None
         self.track_npoints = DEFAULT_PARAMS.track_npoints
+        self.locked_point = 0
         
     def start(self, track):
         self.ax.clear()

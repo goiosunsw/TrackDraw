@@ -149,6 +149,8 @@ class MainWindow(QMainWindow):
         ##### Canvases #####
         click_f0 = partial(slots.mouse, wasClick=True, plot=self.cw.f0_cv, target="F0")
         drag_f0 = partial(slots.mouse, wasClick=False, plot=self.cw.f0_cv, target="F0")
+#        modifiers = QApplication.keyboardModifiers()
+#        if modifiers == Qt.ShiftModifier:
         self.cw.f0_cv.fig.canvas.mpl_connect('button_press_event', click_f0)
         self.cw.f0_cv.fig.canvas.mpl_connect('motion_notify_event', drag_f0)
         

@@ -80,48 +80,40 @@ class Slots:
     def switchPlots(self, *arg, **kwarg):
         """
         Switches between displaying the loaded or synthed signal.
-        
-        TODO - switchover update functionality to pushDisplayUpdates()
         """
         waveform, fs, dur = self.getCurrentWaveform()
-        if len(waveform) == 1:
-            self.master.cw.spec_cv.start(TDD.TRACKS)
-            self.master.cw.wave_cv.plot_waveform(waveform)
-            self.master.cw.wave_cv.clear()
-        else:
-            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
-                    TDD.CURRENT_PARAMS.window_len,
-                    TDD.CURRENT_PARAMS.noverlap,
-                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
-            self.master.cw.wave_cv.plot_waveform(waveform)         
+        self.pushDisplayUpdates(waveform, fs, dur)
             
     @pyqtSlot()
     def enableWave(self, *arg, **kwarg):
         """
         Enables or disables wave display when the wave checkbox is clicked.
+        
+        Simply sets the canvas' visibility status on detection of any change
+        in the associated checkbox. 
+        
+        TODO -- figure out how to properly resize window on change
+        TODO -- figure out how to best set some parameter in the canvas to 
+            disable unnecessary calculations
         """
         if self.master.displayDock.waveCheckBox.checkState() == 0:
-            self.master.cw.wave_cv.enabled = False
+            self.master.cw.wave_cv.setHidden(True)
         else:
-            self.master.cw.wave_cv.enabled = True
-        if self.master.cw.wave_cv.enabled == False:
-            self.master.cw.wave_cv.clear()
-        else:
-            self.master.cw.wave_cv.plot_waveform(self.master.cw.wave_cv.current_waveform)
+            self.master.cw.wave_cv.setHidden(False)
             
     @pyqtSlot()
     def enableSTFT(self, *arg, **kwarg):
         """
         Enables or disables STFT display when the STFT checkbox is clicked.
+
+        TODO -- figure out how to properly resize window on change
+        TODO -- figure out how to best set some parameter in the canvas to 
+            disable unnecessary calculations        
         """
         if self.master.displayDock.STFTCheckBox.checkState() == 0:
-            self.master.cw.stft_cv.enabled = False
+            self.master.cw.stft_cv.setHidden(True)
         else:
-            self.master.cw.stft_cv.enabled = True
-        if self.master.cw.stft_cv.enabled == False:
-            self.master.cw.stft_cv.start()
-        else:
-            self.master.cw.stft_cv.start(restart=True)
+            self.master.cw.stft_cv.setHidden(False)
             
     @pyqtSlot()
     def changeNoTracks(self, curr_index, *arg, **kwarg):
@@ -132,9 +124,6 @@ class Slots:
         and then properly removes or appends Track objects from/to TRACKS. Once
         the nformant variables and TRACKS are properly updated, the current
         waveform is grabbed and spec_cv/wave_cv are updated accordingly.
-        
-        TODO - add proper updates to stft_cv? 
-        TODO - switchover update functionality to pushDisplayUpdates()
         """
         new_nformant = curr_index + 1
         if self.master.cw.spec_cv.nformant > new_nformant:
@@ -142,25 +131,18 @@ class Slots:
         elif self.master.cw.spec_cv.nformant < new_nformant:
             difference = abs(self.master.cw.spec_cv.nformant - new_nformant)
             if difference == 1:
-                TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[curr_index]))          
+                TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*
+                                                    TDD.DEFAULT_PARAMS.FF[curr_index]))          
             elif difference > 1:
                 old_index = self.master.cw.spec_cv.nformant
                 for i in range(difference):
-                    TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*TDD.DEFAULT_PARAMS.FF[old_index+i]))
+                    TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*
+                                                        TDD.DEFAULT_PARAMS.FF[old_index+i]))
         # Need to update both spec_cv's nformant and current_param's nformant
         self.master.cw.spec_cv.nformant = new_nformant
         TDD.CURRENT_PARAMS.nformant = new_nformant
         waveform, fs, dur = self.getCurrentWaveform()     
-        if len(waveform) == 1:
-            self.master.cw.spec_cv.start(TDD.TRACKS)
-            self.master.cw.wave_cv.plot_waveform(waveform)
-            self.master.cw.wave_cv.clear()
-        else:
-            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
-                    TDD.CURRENT_PARAMS.window_len,
-                    TDD.CURRENT_PARAMS.noverlap,
-                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
-            self.master.cw.wave_cv.plot_waveform(waveform)
+        self.pushDisplayUpdates(waveform, fs, dur)
             
     @pyqtSlot()
     def changeNoPoints(self, *arg, **kwarg):
@@ -174,8 +156,6 @@ class Slots:
         accordingly. If points are removed, the data within TRACKS/F0_TRACK is
         simply truncated. If points are added, the the last data value in
         TRACKS/F0_TRACK is appended as necessary to meet the new npoints value.
-        
-        TODO - switchover update functionality to pushDisplayUpdates()
         """
         new_track_npoints = self.master.displayDock.track_npointsGroup.slider.value()
         # Need to update both spec_cv/f0_cv and current_param's nformant
@@ -186,18 +166,7 @@ class Slots:
             TDD.TRACKS[i].changeNoPoints(new_track_npoints)
         TDD.F0_TRACK.changeNoPoints(new_track_npoints)
         waveform, fs, dur = self.getCurrentWaveform()  
-        if len(waveform) == 1:
-            self.master.cw.spec_cv.start(TDD.TRACKS)
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
-            self.master.cw.wave_cv.plot_waveform(waveform)
-            self.master.cw.wave_cv.clear()
-        else:
-            self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
-                    TDD.CURRENT_PARAMS.window_len,
-                    TDD.CURRENT_PARAMS.noverlap,
-                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
-            self.master.cw.wave_cv.plot_waveform(waveform)    
-            self.master.cw.f0_cv.start(TDD.F0_TRACK)
+        self.pushDisplayUpdates(waveform, fs, dur)
             
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
@@ -236,17 +205,22 @@ class Slots:
                         
     @pyqtSlot()
     def changeFrameSize(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.window_len = self.master.analysisDock.frameSizeGroup.currValue
+        TDD.CURRENT_PARAMS.window_len =\
+                self.master.analysisDock.frameSizeGroup.currValue
                
     @pyqtSlot()
     def changeOverlap(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.noverlap = self.master.analysisDock.overlapGroup.currValue*0.01
+        TDD.CURRENT_PARAMS.noverlap =\
+                self.master.analysisDock.overlapGroup.currValue*0.01
         
     @pyqtSlot()
     def changeSTFTSize(self, *arg, **kwarg):
         # Need to update both TDD and stft_cv's stftSize
-        TDD.CURRENT_PARAMS.stft_size = self.master.analysisDock.stftSizeGroup.currValue
-        self.master.cw.stft_cv.stft_size = self.master.analysisDock.stftSizeGroup.currValue
+        TDD.CURRENT_PARAMS.stft_size =\
+                self.master.analysisDock.stftSizeGroup.currValue
+        self.master.cw.stft_cv.stft_size =\
+                self.master.analysisDock.stftSizeGroup.currValue
+        self.master.cw.stft_cv.start(restart=True)
     ##### End analysis slots #####
     
     
@@ -261,7 +235,8 @@ class Slots:
     @pyqtSlot()
     def changeBW(self, *arg, **kwarg):
         for i in range(5):
-            TDD.CURRENT_PARAMS.BW[i] = self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
+            TDD.CURRENT_PARAMS.BW[i] =\
+                 self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
         
     @pyqtSlot()
     def changeSource(self, curr_index, *arg, **kwarg):
@@ -282,14 +257,17 @@ class Slots:
         current synthesis parameters and updates SYNTH_SOUND.waveform 
         accordingly. Then, if the synth radio button is checked, the changes
         to the waveform are reflected in the display.
-        
-        TODO - rewrite synthesizers to directly handle Track objects!
         """
         TDD.CURRENT_PARAMS.F0 = TDD.F0_TRACK.points
         TDD.CURRENT_PARAMS.FF = np.zeros([TDD.CURRENT_PARAMS.track_npoints,
                                           TDD.CURRENT_PARAMS.nformant])
         for i in range(TDD.CURRENT_PARAMS.nformant):
             TDD.CURRENT_PARAMS.FF[:,i] = TDD.TRACKS[i].points
+        if TDD.LOADED_SOUND.dur < 0.05:
+            TDD.CURRENT_PARAMS.dur = 1
+        else:
+            TDD.CURRENT_PARAMS.dur = TDD.LOADED_SOUND.dur
+        
         if TDD.CURRENT_PARAMS.synth_type == "Klatt 1980":
             TDD.SYNTH_SOUND.waveform = synth.klatt.klatt_make(TDD.CURRENT_PARAMS)
         elif TDD.CURRENT_PARAMS.synth_type == "Sine wave":
@@ -393,7 +371,76 @@ class Slots:
                 self.master.cw.stft_cv.update_stft(magnitude)
         except TypeError:
             pass
-#            self.master.cw.stft_cv.plot_magnitude(magnitude)
+        
+    @pyqtSlot()
+    def mouse_ctrl(self, *arg, **kwarg):
+        event = list(arg)[0]
+        x_loc = None
+        y_loc = None
+        # If mouse button is down, perform track updates
+        if event.button:
+            try:
+                plot = kwarg["plot"]
+                target = kwarg["target"]
+                wasClick = kwarg["wasClick"]
+                x_loc, y_loc = plot.mouse(event)
+                dist_to_x_pts = np.abs(np.linspace(0,TDD.CURRENT_PARAMS.track_npoints-1,TDD.CURRENT_PARAMS.track_npoints) - x_loc)
+                nearest_x_idx = dist_to_x_pts.argmin()
+                if target == "F0":
+                    if wasClick == True:
+                        plot.locked_point = nearest_x_idx
+                        TDD.F0_TRACK.points[nearest_x_idx] = y_loc
+                        plot.update_track(TDD.F0_TRACK.points)
+                    elif wasClick == False:
+                        if plot.locked_point == nearest_x_idx:
+                            TDD.F0_TRACK.points[nearest_x_idx] = y_loc
+                            plot.update_track(TDD.F0_TRACK.points)
+                        elif plot.locked_point != nearest_x_idx:
+                            difference = abs(plot.locked_point - nearest_x_idx)
+                            if plot.locked_point > nearest_x_idx:
+                                TDD.F0_TRACK.points[nearest_x_idx:plot.locked_point] = np.linspace(y_loc, TDD.F0_TRACK.points[plot.locked_point], difference)
+                            elif plot.locked_point < nearest_x_idx:
+                                TDD.F0_TRACK.points[plot.locked_point:nearest_x_idx] = np.linspace(TDD.F0_TRACK.points[plot.locked_point], y_loc, difference)
+                            plot.update_track(TDD.F0_TRACK.points)
+                elif target == "FF":
+                    if wasClick == True:
+                        y_coords_at_nearest_x = np.array([track.points[nearest_x_idx] for track in TDD.TRACKS])
+                        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
+                        trackNo = dist_to_y_pts.argmin()
+                        TDD.TRACKS[trackNo].points[nearest_x_idx] = y_loc
+                        plot.update_track(TDD.TRACKS[trackNo].points, trackNo)
+                        plot.locked_track = trackNo
+                    elif wasClick == False:
+                        TDD.TRACKS[plot.locked_track].points[nearest_x_idx] = y_loc
+                        plot.update_track(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
+            except TypeError:
+                pass
+        else:
+            try:
+                plot = kwarg["plot"]
+                target = kwarg["target"]
+                wasClick = kwarg["wasClick"]
+                x_loc, y_loc = plot.mouse(event)
+            except TypeError:
+                pass
+        # Regardless of if mouse button is down, perform stft update
+        waveform, fs, dur = self.getCurrentWaveform()
+        if x_loc == None:
+            try:
+                x_loc, y_loc = plot.mouse(event)
+            except TypeError:
+                pass
+            # Meed to convert from track dimensions to regular dimensions
+        try:
+            x_loc = x_loc/TDD.CURRENT_PARAMS.track_npoints
+            x_loc = int(x_loc*dur*fs)
+            if TDD.CURRENT_PARAMS.stft_size < x_loc < round(fs*dur)-TDD.CURRENT_PARAMS.stft_size:
+                waveform = waveform/np.max(np.abs(waveform))
+                magnitude = np.fft.rfft(waveform[x_loc-TDD.CURRENT_PARAMS.stft_size:x_loc+TDD.CURRENT_PARAMS.stft_size])
+                magnitude = 20*np.log10(np.abs(magnitude))
+                self.master.cw.stft_cv.update_stft(magnitude)
+        except TypeError:
+            pass
     ##### End track slots #####
     
     
@@ -406,6 +453,7 @@ class Slots:
         time.sleep(dur)
     ##### End playback slots #####
     
+    
     ##### Non-slots #####
     def getCurrentWaveform(self):
         """
@@ -414,6 +462,11 @@ class Slots:
         Checks which display radio button (synth or loaded) is currently 
         checked. Then grabs the correct waveform, fs, and dur associated with
         the current displayed signal. 
+        
+        TODO -- replace with a better system. Right now, anytime changes occur
+            to display/plotting parameters, the slot which handles that update
+            calls this method to get the current waveform. In the long run,
+            there needs to be some better way of doing this. 
         """
         if self.master.displayDock.synthedRadioButton.isChecked():
             waveform = TDD.SYNTH_SOUND.waveform
@@ -431,12 +484,9 @@ class Slots:
         
         This is a utility function called by various slots whenever they change
         elements pertaining to the canvases/display. It updates the display 
-        in an appropriate way. 
-        
-        TODO - better doc string
-        TODO - currently can't replace some similar functionality with this 
-        function, need to figure out what's different and make adjustments 
-        accordingly. (i.e. don't use it yet, except for resizing)
+        in an appropriate way by calling the canvases' start() methods if the
+        length of the waveform is 1 (i.e. the waveform is empty) or by calling
+        the canvases' plot_***() methods. 
         """
         if len(waveform) == 1:
             self.master.cw.spec_cv.start(TDD.TRACKS)
@@ -447,7 +497,7 @@ class Slots:
             self.master.cw.spec_cv.plot_specgram(dur, waveform, fs,
                     TDD.CURRENT_PARAMS.window_len,
                     TDD.CURRENT_PARAMS.noverlap,
-                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS, restart=True)
+                    TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(waveform)
             self.master.cw.f0_cv.start(TDD.F0_TRACK)
         
