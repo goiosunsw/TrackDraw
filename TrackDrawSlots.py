@@ -87,7 +87,10 @@ class Slots:
         """
         Switches between displaying the loaded or synthed signal.
         
-        TODO -- seems a little slow... look into profiling it
+        TODO -- seems a little slow... look into profiling it... probably is
+            just the amount of plotting that needs to be done, and
+            matplotlib is really slow by default. maybe we can convert wave
+            canvas to be animated as well if it would help.
         """
         waveform, fs, dur = self.getCurrentWaveform()
         self.pushDisplayUpdates(waveform, fs, dur)
@@ -283,21 +286,15 @@ class Slots:
         for i in range(5):
             TDD.CURRENT_PARAMS.BW[i] =\
                  self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
+    
+    @pyqtSlot()
+    def changeAV(self, *arg, **kwarg):
+        TDD.CURRENT_PARAMS.AV = self.master.synthesisDock.avSlider.slider.value()
         
     @pyqtSlot()
-    def changeSource(self, curr_index, *arg, **kwarg):
-        """ 
-        Changes source type for Klatt syntheiszer
+    def changeAVS(self, *arg, **kwarg):
+        TDD.CURRENT_PARAMS.AVS = self.master.synthesisDock.avsSlider.slider.value()
         
-        DEPRECATED - need to replace
-        """
-        if curr_index == 0:
-            TDD.CURRENT_PARAMS.voicing = "Full Voicing"
-        if curr_index == 1:
-            TDD.CURRENT_PARAMS.voicing = "QS Voicing"
-        if curr_index == 2:
-            TDD.CURRENT_PARAMS.voicing = "Noise"
-            
     @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
         """
@@ -382,7 +379,7 @@ class Slots:
         TODO -- add alternative functionality when SHIFT or CTRL keys are
             applied. See main.py for some helpful code to make those as well as
             the deprecated mouse_shift() slot below.
-        TODO -- beautify the code
+        TODO -- beautify the code, it's kinda ugly...
         """
         event = list(arg)[0]
         x_loc = None

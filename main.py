@@ -47,7 +47,8 @@ class MainWindow(QMainWindow):
         synthesize = partial(slots.synthesize)
         changeBW = partial(slots.changeBW)
         changeSynth = partial(slots.changeSynth)
-        changeSource = partial(slots.changeSource)
+        changeAV = partial(slots.changeAV)
+        changeAVS = partial(slots.changeAVS)
         
         play = partial(slots.play)
         ##### End callbacks setup #####
@@ -124,7 +125,6 @@ class MainWindow(QMainWindow):
         self.analysisDock.windowComboBox.activated.connect(changeWindow)
         self.synthesisDock.methodComboBox.activated.connect(changeSynth)
         self.synthesisDock.nformantComboBox.activated.connect(changeNoTracks)
-        self.synthesisDock.voicingComboBox.activated.connect(changeSource)
         #### End Combo Boxes Setup #####
         
         ##### Sliders #####
@@ -134,6 +134,8 @@ class MainWindow(QMainWindow):
             self.synthesisDock.FFBandwidthGroup.sliders[i].valueChanged.connect(changeBW)
         self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
         self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
+        self.synthesisDock.avSlider.slider.valueChanged.connect(changeAV)
+        self.synthesisDock.avsSlider.slider.valueChanged.connect(changeAVS)
         ##### End sliders setup #####
         
         ##### Buttons #####

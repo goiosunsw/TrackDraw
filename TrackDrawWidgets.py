@@ -616,8 +616,9 @@ class SynthesisDock(QDockWidget):
             number of formants to be synthesized.
         klattGroup (QGroupBox) -- groupbox for Klatt synthesizer parameters
         sineGroup (QGroupBox) -- groupbox for Sine wave synthesizer parameters
-        voicingComboBox (QComboBox) -- part of klattGroup, allows for selection
-            of voicing type (DEPRECATED -- NEED TO REPLACE)
+        avSlider (SliderGroup) -- slider to control AV (amplitude of voicing)
+        avsSlider (SliderGroup) -- slider to control AVS (amplitude of quasi-
+            sinusoidal voicing)
         FFBandwidthGroup (SliderGroup2) -- group of sliders to allow for
             selection formant bandwidths to be synthesized.
         synthButton (QButton) -- button for initiating synthesis using current
@@ -669,25 +670,13 @@ class SynthesisDock(QDockWidget):
 
         voicingGroup = QWidget()
         voicingVBox = QVBoxLayout()
-        voicingGroup.setLayout(voicingVBox)
-        voicingLabel = QLabel("Voicing source:")
-        self.voicingComboBox = QComboBox()
-        self.voicingComboBox.addItems(\
-                ["Full voicing", "Quasi-sinusoidal", "Noise"])
-        self.voicingComboBox.setCurrentIndex(0)
-        voicingVBox.addWidget(voicingLabel)
-        voicingVBox.addWidget(self.voicingComboBox)
-
-        F1BandwidthGroup = SliderGroup(label="F1 bandwidth:", units="Hz",
-                minimum=5, maximum=20, value=10)
-        F2BandwidthGroup = SliderGroup(label="F2 bandwidth:", units="Hz",
-                minimum=5, maximum=20, value=10)
-        F3BandwidthGroup = SliderGroup(label="F3 bandwidth:", units="Hz",
-                minimum=5, maximum=20, value=10)
-        F4BandwidthGroup = SliderGroup(label="F4 bandwidth:", units="Hz",
-                minimum=5, maximum=20, value=10)
-        F5BandwidthGroup = SliderGroup(label="F5 bandwidth:", units="Hz",
-                minimum=5, maximum=20, value=10)
+        voicingGroup.setLayout(voicingVBox)        
+        self.avSlider = SliderGroup(label="Amplitude of Voicing:", units="dB",
+                                    minimum=-40, maximum=40, value=0)
+        self.avsSlider = SliderGroup(label="Amplitude of QS Voicing", units="dB",
+                                     minimum=-40, maximum=40, value=0)
+        voicingVBox.addWidget(self.avSlider)
+        voicingVBox.addWidget(self.avsSlider)
 
         self.FFBandwidthGroup = SliderGroup2(\
                 labels=["F1 bandwidth:", "F2 bandwidth:", "F3 bandwidth:",
@@ -701,7 +690,6 @@ class SynthesisDock(QDockWidget):
                 stepSizes=[5, 5, 5, 5, 5],
                 stepDoubles=[False, False, False, False, False])
 
-        klattVBox.addWidget(voicingLabel)
         klattVBox.addWidget(voicingGroup)
         #klattVBox.addWidget(F1BandwidthGroup)
         #klattVBox.addWidget(F2BandwidthGroup)

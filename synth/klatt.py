@@ -31,7 +31,8 @@ def klatt_make(parms):
     """
     Extracts necessary parameters from TrackDraw 2016 Parameters object.
     
-    parms -- input TrackDraw 2016 Parameters object
+    Arguments:
+        parms (TrackDrawData.Parameters object) -- input parameters
     
     klatt_make extracts necessary parameters from a Parameters object for
     syntheisizing a vowel waveform in the Klatt synthesizer, then calls
@@ -41,29 +42,34 @@ def klatt_make(parms):
     f0 = parms.F0
     ff = parms.FF
     bw = parms.BW
+    av = parms.AV
+    avs = parms.AVS
     fs = parms.synth_fs
     dur = parms.dur
-    source = parms.voicing
-    y = klatt_bridge(f0, ff, bw, fs, dur, source)
+    y = klatt_bridge(f0, ff, bw, av, avs, fs, dur)
     return(y)
     
-def klatt_bridge(f0, ff, bw, fs, dur, source, inv_samp=50):
+def klatt_bridge(f0, ff, bw, av, avs, fs, dur, inv_samp=50):
     """
     Processes/interpolates input parameters for Klatt synth, runs synth.
     
+    Arguments:
+        f0 (Track object) -- fundamental frequency contour
+        ff (list, len n_form, Track objects) -- formant frequency contours, one
+            for each formant to be synthesized.
+        bw (np.array, len n_form) -- formant bandwidth values, one for each
+            formant to be synthesized.
+        av (float) -- amplitude of voicing in dB
+        avs (float) -- amplitude of quasi-sinusoidal voicing in dB
+        fs (int) -- sampling rate in Hz
+        dur (float) -- duration in seconds
+        inv_samp (sample) -- number of samples to be synthesized in a single
+            interval. 
+        
     Takes a variety of synthesis parameters passed to it from klatt_make and 
     interpolates them or derives other values from them as necessary for Klatt
     synthesis. Then passes them to a Klatt_Synth object and runs the synthesis
     routine, returning the resultant waveform back to klatt_make. 
-    
-    f0 -- fundamental frequency contour (Track object)
-    ff -- formant frequency contour (list of Track objects)
-    bw -- bandwidth values for formants (should be as many as there are 
-          formants to be synthesized, in numpy array)
-    fs -- sample rate to synthesize at (integer)
-    dur -- duration in seconds (float)
-    env -- envelope contour (numpy array)
-    source -- type of source to be used (string, see TrackDrawSlots)
     """
     from scipy.interpolate import interp1d
     import numpy as np
@@ -96,7 +102,7 @@ def klatt_bridge(f0, ff, bw, fs, dur, source, inv_samp=50):
             except IndexError:
                 interp_bw.append(interpolate(bw[i], n_inv))
     # Finally, create synth object, run it, and return its output waveform    
-    synth = Klatt_Synth(f0=interp_f0, ff=interp_ff, bw=interp_bw,
+    synth = Klatt_Synth(f0=interp_f0, ff=interp_ff, bw=interp_bw, av=av, avs=avs,
                         fs=fs, n_inv=n_inv, n_form=n_form, inv_samp=inv_samp)
     synth.synth()
     return(synth.output)
@@ -116,6 +122,8 @@ class Klatt_Synth:
         n_form (integer) -- number of formants to be synthesized (integer).
             Cannot vary over the duration of the synthesized vowel.
         inv_samp (integer) -- length of each interval in samples
+        av (float) -- amplitude of voicing, dB
+        avs (float) -- amplitude of quasi-sinusoidal voicing, dB
     
     To generate a waveform from a Klatt_Synth object using the parameters
     provided to it, call its synth() method.
@@ -147,14 +155,12 @@ class Klatt_Synth:
     sections only have output vectors). 
     
     TODO -- add AV/AVS input dB values
-    TODO -- remove references to source and env arguments
-    TODO -- add nasal resonators
     TODO -- Add other sections (noise source and parallel branch)
     TODO -- Optimize
     """
     def __init__(self, f0, ff, bw, fs, n_inv, n_form, inv_samp,
                  av=0, af=0, ah=0, avs=0, fgp=0, bgp=100, fgz=1500, bgz=6000,
-                 bgs=200):
+                 bgs=200, fnp=270, fnz=270, bnp=100, bnz=100):
         # Initialize time-varying synthesis parameters
         self.f0 = f0
         self.ff = ff
@@ -168,6 +174,10 @@ class Klatt_Synth:
         self.fgz = [fgz]*n_inv
         self.bgz = [bgz]*n_inv
         self.bgs = [bgs]*n_inv
+        self.fnp = [fnp]*n_inv
+        self.fnz = [fnz]*n_inv
+        self.bnp = [bnp]*n_inv
+        self.bnz = [bnz]*n_inv
         
         # Initialize non-time-varying synthesis parameters 
         self.inv_samp = inv_samp
@@ -265,7 +275,7 @@ class Klatt_Voice(Klatt_Section):
         self.av.amplify(dB=self.master.av[self.master.current_inv])
         self.rgs.resonate(ff=self.master.fgp[self.master.current_inv],
                           bw=self.master.bgs[self.master.current_inv])
-        self.avs.amplify(dB=self.master.av[self.master.current_inv]) # current dB @ -40 essentially disables it
+        self.avs.amplify(dB=self.master.avs[self.master.current_inv])
         self.mixer.mix()
         self.output[:] = self.mixer.output[:]
         
@@ -279,15 +289,22 @@ class Klatt_Cascade(Klatt_Section):
     def __init__(self, master, input_connect=None):
         Klatt_Section.__init__(self, master)
         self.mixer = Mixer(master=self.master, input_connect=input_connect)
+        self.rnp = Resonator(master=self.master, input_connect=[self.mixer])
+        self.rnz = Resonator(master=self.master, input_connect=[self.rnp],
+                             anti=True)
         self.formants = []
-        self.formants.append(Resonator(master=self.master, input_connect=[self.mixer]))
+        self.formants.append(Resonator(master=self.master, input_connect=[self.rnz]))
         previous_formant = self.formants[0]
-        for i in range(1, self.master.n_form):
+        for form in range(1, self.master.n_form):
             self.formants.append(Resonator(master=self.master, input_connect=[previous_formant]))
-            previous_formant = self.formants[i]
+            previous_formant = self.formants[form]
 
     def run(self):
         self.mixer.mix()
+        self.rnp.resonate(self.master.fnp[self.master.current_inv],
+                          self.master.bnp[self.master.current_inv])
+        self.rnz.resonate(self.master.fnz[self.master.current_inv],
+                          self.master.bnz[self.master.current_inv])
         for form in range(self.master.n_form):
             self.formants[form].resonate(self.master.ff[form][self.master.current_inv],
                                          self.master.bw[form][self.master.current_inv])
@@ -336,6 +353,8 @@ class Klatt_Component:
     Arguments:
         master (Klatt_Synth object) -- Klatt_Synth object this section is part of
         input_connect (Klatt_Section object) -- see Klatt_Synth doc string
+        
+    TODO -- write doc-string explaining delay functionality 
     """
     def __init__(self, master, input_connect=None):
         self.master = master
@@ -356,6 +375,19 @@ class Resonator(Klatt_Component):
     
     Arguments:
         anti (boolean) -- if True, Resonator will act as antiresonator
+        
+    Attributes:
+        anti (boolean) -- see arguments
+        delay (list, len 2) -- if anti is False, stores final two output values
+            in each interval of processing. If anti is False, stores final two
+            input values in each interval of processing. This is because the 
+            resonator has two delay taps, and when processing the first two
+            samples of any given interval needs the final two samples from the
+            previous interval's output (if resonating) or input (if anti-
+            resonating).
+        
+    TODO -- replace main filter loop with Cython code? Or find some way to
+        optimize.
     """
     def __init__(self, master, input_connect=None, anti=False):
         Klatt_Component.__init__(self, master, input_connect)
@@ -380,32 +412,52 @@ class Resonator(Klatt_Component):
             a_prime = 1/a
             b_prime = -b/a
             c_prime = -c/a
-            a = a_prime
-            b = b_prime
-            c = c_prime
+            return(a_prime, b_prime, c_prime)
         return(a, b, c)  
     
     def resonate(self, ff, bw):
         self.pull()
         a, b, c = self.calc_coef(ff, bw, anti=self.anti)
-#        self.output[:] = c_resonate(self.input, self.output, self.delay, a, b, c)
-        self.output[0] = a*self.input[0] + b*self.delay[1] + c*self.delay[0]
-        self.output[1] = a*self.input[1] + b*self.output[0] + c*self.delay[1]
-        for n in range(2, self.master.inv_samp):
-            self.output[n] = a*self.input[n] + b*self.output[n-1] + c*self.output[n-2]
-        self.delay[:] = self.output[len(self.output)-2:len(self.output)]
+        if self.anti == True:
+            self.output[0] = a*self.input[0] + b*self.delay[1]\
+                                + c*self.delay[0]
+            self.output[1] = a*self.input[1] + b*self.input[0]\
+                                + c*self.delay[1]
+            for n in range(2, self.master.inv_samp):
+                self.output[n] = a*self.input[n] + b*self.input[n-1]\
+                                    + c*self.input[n-2]
+            self.delay[:] = self.input[len(self.input)-2:len(self.input)]
+        elif self.anti == False:
+            self.output[0] = a*self.input[0] + b*self.delay[1]\
+                                    + c*self.delay[0]
+            self.output[1] = a*self.input[1] + b*self.output[0]\
+                                    + c*self.delay[1]
+            for n in range(2, self.master.inv_samp):
+                self.output[n] = a*self.input[n] + b*self.output[n-1]\
+                                + c*self.output[n-2]
+            self.delay = self.output[len(self.output)-2:len(self.output)]
 
 
 class Impulse(Klatt_Component):
     """
     Klatt time-varying impulse generator.
+    
+    Calculates the length of a glottal pulse period in samples based on the
+    current interval's sampling rate and F0 value, stores this value in
+    glot_period. Then goes through each sample of the current interval to 
+    determine if glot_period samples have passed since the last glottal pulse,
+    whose index is stored in Klatt_Synth as an attribute called last_glot_pulse.
+    
+    TODO -- optimize? May not be worth it, it doesn't get called much.
+        Resonator is more important.
     """
     def __init__(self, master):
         Klatt_Component.__init__(self, master)
         
     def impulse_gen(self):
         self.output = [0]*self.master.inv_samp
-        glot_period = round(self.master.fs/self.master.f0[self.master.current_inv])
+        glot_period = round(self.master.fs
+                            /self.master.f0[self.master.current_inv])
         for n in range(self.master.inv_samp):
             if (self.master.current_ind + n) - self.master.last_glot_pulse >= glot_period:
                 self.output[n] = 1
@@ -415,6 +467,9 @@ class Impulse(Klatt_Component):
 class Amplifier(Klatt_Component):
     """
     Simple amplifier.
+    
+    Scales input sample values by a decibel value. Can handle negative and
+    positive decibel values.
     """
     def __init__(self, master, input_connect=None):
         Klatt_Component.__init__(self, master, input_connect)
@@ -453,6 +508,11 @@ class Mixer(Klatt_Component):
 class Rad_Char(Klatt_Component):
     """
     Simple first difference operator to simulate radiation characteristic.
+    
+    Attributes:
+        delay (list, len 1) -- stores final output value in each interval of
+            processing. Then, in the next interval of processing used to
+            handle the delay tap reference for the first sample processed.
     """
     def __init__(self, master, input_connect=None):
         Klatt_Component.__init__(self, master, input_connect)

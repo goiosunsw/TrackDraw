@@ -76,10 +76,11 @@ class Parameters:
     def __init__(self, F0=100,
                        FF=[500, 1500, 2500, 3500, 4500],
                        BW=np.array([50, 100, 100, 200, 250]),
+                       AV=0,
+                       AVS=0,
                        resample_fs=10000,
                        synth_fs=10000,
                        track_npoints=40,
-                       voicing="Full Voicing",
                        window_len=256,
                        window_type=np.hamming,
                        noverlap=0.5,
@@ -93,10 +94,11 @@ class Parameters:
         self.F0 = F0
         self.FF = FF
         self.BW = BW
+        self.AV = AV
+        self.AVS = AVS
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints
-        self.voicing = voicing
         self.window_len = window_len
         self.window_type = window_type
         self.noverlap = noverlap
