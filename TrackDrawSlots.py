@@ -369,7 +369,7 @@ class Slots:
         plotted area. The x_loc and y_loc received are in coordinates in terms
         of the tracks. Then, the nearest vertex is found, the track(s) data in
         TDD is updated, and the updated track data is sent back to the relevant
-        canvas using the canvas' update_track method. 
+        canvas using the canvas' updateCanvas() method. 
         
         The general pattern for stft updates is that an x_loc and y_loc are
         received from the canvas if the mouse is within the bounds of the
@@ -379,9 +379,10 @@ class Slots:
         (i.e. if an stft has room to be calculated) it is calculated, converted
         to log scale, and passed to stft_cv via stft_cv's update_stft method.
         
-        TODO -- convert TrackDraw canvases to a universal subclass of
-            FigureCanvas and generalize the functionality of mouse()
-            accordingly. Working on it today and tomorrow - 08/03, DG. 
+        TODO -- add alternative functionality when SHIFT or CTRL keys are
+            applied. See main.py for some helpful code to make those as well as
+            the deprecated mouse_shift() slot below.
+        TODO -- beautify the code
         """
         event = list(arg)[0]
         x_loc = None
@@ -389,28 +390,35 @@ class Slots:
         # If mouse button is down, perform track updates
         if event.button:
             try:
+                # Extract variables from kwarg
                 plot = kwarg["plot"]
                 target = kwarg["target"]
                 wasClick = kwarg["wasClick"]
                 x_loc, y_loc = plot.mouse(event)
-                dist_to_x_pts = np.abs(np.linspace(0,TDD.CURRENT_PARAMS.track_npoints-1,TDD.CURRENT_PARAMS.track_npoints) - x_loc)
-                nearest_x_idx = dist_to_x_pts.argmin()
+                # Get correct tracks
                 if target == "F0":
-                    TDD.F0_TRACK[0].points[nearest_x_idx] = y_loc
-                    plot.updateCanvas(TDD.F0_TRACK[0].points, trackNo=0)
+                    tracks = TDD.F0_TRACK
                 elif target == "FF":
-                    if wasClick == True:
-                        y_coords_at_nearest_x = np.array([track.points[nearest_x_idx] for track in TDD.TRACKS])
-                        dist_to_y_pts = np.abs(y_coords_at_nearest_x - y_loc)
-                        trackNo = dist_to_y_pts.argmin()
-                        TDD.TRACKS[trackNo].points[nearest_x_idx] = y_loc
-                        plot.updateCanvas(TDD.TRACKS[trackNo].points, trackNo)
-                        plot.locked_track = trackNo
-                    elif wasClick == False:
-                        TDD.TRACKS[plot.locked_track].points[nearest_x_idx] = y_loc
-                        plot.updateCanvas(TDD.TRACKS[plot.locked_track].points, plot.locked_track)
+                    tracks = TDD.TRACKS
+                # Find nearest x index
+                dist_to_x_pts = np.abs(np.linspace(0,
+                                       TDD.CURRENT_PARAMS.track_npoints-1,
+                                       TDD.CURRENT_PARAMS.track_npoints) - x_loc)
+                nearest_x_idx = dist_to_x_pts.argmin()
+                if wasClick == True:
+                    y_coords_at_nearest_x = np.array([track.points[nearest_x_idx]
+                                                      for track in tracks])
+                    dist_to_y_points = np.abs(y_coords_at_nearest_x - y_loc)
+                    trackNo = dist_to_y_points.argmin()
+                    plot.locked_track = trackNo
+                    tracks[trackNo].points[nearest_x_idx] = y_loc
+                    plot.updateCanvas(tracks, trackNo)
+                elif wasClick == False:
+                    tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+                    plot.updateCanvas(tracks, plot.locked_track)
             except TypeError:
                 pass
+        # Even if mouse button is not down, still update STFT display
         else:
             try:
                 plot = kwarg["plot"]
@@ -419,14 +427,12 @@ class Slots:
                 x_loc, y_loc = plot.mouse(event)
             except TypeError:
                 pass
-        # Regardless of if mouse button is down, perform stft update
         waveform, fs, dur = self.getCurrentWaveform()
         if x_loc == None:
             try:
                 x_loc, y_loc = plot.mouse(event)
             except TypeError:
                 pass
-            # Meed to convert from track dimensions to regular dimensions
         try:
             x_loc = x_loc/TDD.CURRENT_PARAMS.track_npoints
             x_loc = int(x_loc*dur*fs)

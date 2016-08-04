@@ -104,7 +104,7 @@ class trackCanvas(FigureCanvas):
         Arguments:
             tracks (list) -- list of TrackDrawData.Track objects.
             
-        Used whenever canvas is initialized.
+        Used whenever canvas is initialized, or when one needs a fresh empty background.
         """
         self.ax.clear()
         self.tracks = []
@@ -128,14 +128,13 @@ class trackCanvas(FigureCanvas):
         if x_min < x_loc < x_max and y_min < y_loc < y_max:
             return(x_loc, y_loc)
         
-    def updateCanvas(self, new_track=0, trackNo=0, redraw=False):
+    def updateCanvas(self, new_tracks=0, trackNo=0, redraw=False):
         """
         Animates canvas.
         
         Arguments:
-            new_track (np.array) -- array of new y coordinates for track to be
-                updated.
-            trackNo (int) -- index of track to be updated
+            new_tracks (list) -- list of Track objects.
+            trackNo (int) -- index of track which has been updated.
             redraw (boolean) -- if True, does not use new_track and trackNo
                 arguments to change a track.
         
@@ -148,7 +147,7 @@ class trackCanvas(FigureCanvas):
         self.ax.set_ylim(self.y_low, self.y_high)
         self.fig.canvas.restore_region(self.background)
         if redraw == False:
-            self.tracks[trackNo][0].set_ydata(new_track)
+            self.tracks[trackNo][0].set_ydata(new_tracks[trackNo].points)
         if self.enabled:
             for i in range(len(self.tracks)):
                 self.ax.draw_artist(self.tracks[i][0])
