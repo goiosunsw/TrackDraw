@@ -296,6 +296,10 @@ class Slots:
         TDD.CURRENT_PARAMS.AVS = self.master.synthesisDock.avsSlider.slider.value()
         
     @pyqtSlot()
+    def changeAH(self, *arg, **kwarg):
+        TDD.CURRENT_PARAMS.AH = self.master.synthesisDock.ahSlider.slider.value()
+        
+    @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
         """
         Synthesizes waveform with current syntheis parameters.

@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         changeSynth = partial(slots.changeSynth)
         changeAV = partial(slots.changeAV)
         changeAVS = partial(slots.changeAVS)
+        changeAH = partial(slots.changeAH)
         
         play = partial(slots.play)
         ##### End callbacks setup #####
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
         self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
         self.synthesisDock.avSlider.slider.valueChanged.connect(changeAV)
         self.synthesisDock.avsSlider.slider.valueChanged.connect(changeAVS)
+        self.synthesisDock.ahSlider.slider.valueChanged.connect(changeAH)
         ##### End sliders setup #####
         
         ##### Buttons #####

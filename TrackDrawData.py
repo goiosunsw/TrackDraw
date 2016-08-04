@@ -78,6 +78,7 @@ class Parameters:
                        BW=np.array([50, 100, 100, 200, 250]),
                        AV=0,
                        AVS=0,
+                       AH=-20,
                        resample_fs=10000,
                        synth_fs=10000,
                        track_npoints=40,
@@ -96,6 +97,7 @@ class Parameters:
         self.BW = BW
         self.AV = AV
         self.AVS = AVS
+        self.AH = AH
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints

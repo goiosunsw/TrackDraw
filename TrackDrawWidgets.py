@@ -672,11 +672,17 @@ class SynthesisDock(QDockWidget):
         voicingVBox = QVBoxLayout()
         voicingGroup.setLayout(voicingVBox)        
         self.avSlider = SliderGroup(label="Amplitude of Voicing:", units="dB",
-                                    minimum=-40, maximum=40, value=0)
+                                    minimum=-40, maximum=40,
+                                    value=DEFAULT_PARAMS.AV)
         self.avsSlider = SliderGroup(label="Amplitude of QS Voicing", units="dB",
-                                     minimum=-40, maximum=40, value=0)
+                                     minimum=-40, maximum=40,
+                                     value=DEFAULT_PARAMS.AVS)
+        self.ahSlider = SliderGroup(label="Amplitude of Aspiration", units="dB",
+                                    minimum=-40, maximum=40,
+                                    value=DEFAULT_PARAMS.AH)
         voicingVBox.addWidget(self.avSlider)
         voicingVBox.addWidget(self.avsSlider)
+        voicingVBox.addWidget(self.ahSlider)
 
         self.FFBandwidthGroup = SliderGroup2(\
                 labels=["F1 bandwidth:", "F2 bandwidth:", "F3 bandwidth:",
