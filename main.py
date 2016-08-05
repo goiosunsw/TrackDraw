@@ -36,14 +36,12 @@ class MainWindow(QMainWindow):
         enableSTFT = partial(slots.enableSTFT)
         changeNoTracks = partial(slots.changeNoTracks)
         self.onResize = partial(slots.onResize)
-        changeNoPoints = partial(slots.changeNoPoints)
-        changeBubble = partial(slots.changeBubble)
-        changeBubbleLen = partial(slots.changeBubbleLen)
+        changeTracks = partial(slots.changeTracks)
+        enableBubble = partial(slots.enableBubble)
         
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
-        changeFrameSize = partial(slots.changeFrameSize)
-        changeOverlap = partial(slots.changeOverlap)
+        changeSpectrogram = partial(slots.changeSpectrogram)
         changeSTFTSize = partial(slots.changeSTFTSize)
         
         synthesize = partial(slots.synthesize)
@@ -129,15 +127,16 @@ class MainWindow(QMainWindow):
         #### End Combo Boxes Setup #####
         
         ##### Sliders #####
-        self.analysisDock.frameSizeGroup.slider.valueChanged.connect(changeFrameSize)
-        self.analysisDock.overlapGroup.slider.valueChanged.connect(changeOverlap)
+        keys = ["Frame size", "Frame overlap", "Threshold"]
+        for i in range(3):
+            self.analysisDock.spectrogramGroup.sliders[keys[i]].valueChanged.connect(changeSpectrogram)
         keys = ["F1 bandwidth", "F2 bandwidth", "F3 bandwidth", "F4 bandwidth",
                 "F5 bandwidth"]
         for i in range(5):
             self.synthesisDock.FFBandwidthGroup.sliders[keys[i]].valueChanged.connect(changeBW)
-        self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
-        self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
-        self.displayDock.trackBubbleSlider.slider.valueChanged.connect(changeBubbleLen)
+        keys = ["Number of points", "Bubble size"]
+        for i in range(2):
+            self.displayDock.trackGroup.sliders[keys[i]].valueChanged.connect(changeTracks)
         keys = ["Amplitude of voicing", "Amplitude of QS voicing",
                 "Amplitude of aspiration", "Amplitude of frication"]
         for i in range(4):
@@ -152,7 +151,7 @@ class MainWindow(QMainWindow):
         self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
         self.displayDock.showFTCheckBox.stateChanged.connect(enableTracks)
         self.displayDock.STFTCheckBox.stateChanged.connect(enableSTFT)
-        self.displayDock.trackBubbleCheckBox.stateChanged.connect(changeBubble)
+        self.displayDock.trackBubbleCheckBox.stateChanged.connect(enableBubble)
         ##### End buttons setup #####
         
         ##### Canvases #####

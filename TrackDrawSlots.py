@@ -160,42 +160,28 @@ class Slots:
         TDD.CURRENT_PARAMS.nformant = new_nformant
         waveform, fs, dur = self.getCurrentWaveform()     
         self.pushDisplayUpdates(waveform, fs, dur)
-            
-    @pyqtSlot()
-    def changeNoPoints(self, *arg, **kwarg):
-        """
-        Changes the number of points in tracks when npoints slider is changed.
-        
-        changeNoPoints updates the number of points in both spec_cv and f0_cv's
-        line data whenever track_npointsGroup (slider) is updated. Updates the
-        track_npoints variable in CURRENT_PARAMS, spec_cv, and f0_cv, and then
-        grabs current waveform data and updates spec_cv/wave_cv/f0_cv
-        accordingly. If points are removed, the data within TRACKS/F0_TRACK is
-        simply truncated. If points are added, the the last data value in
-        TRACKS/F0_TRACK is appended as necessary to meet the new npoints value.
-        """
-        new_track_npoints = self.master.displayDock.track_npointsGroup.slider.value()
-        # Need to update both spec_cv/f0_cv and current_param's nformant
-        TDD.CURRENT_PARAMS.track_npoints = new_track_npoints
-        self.master.cw.spec_cv.track_npoints = new_track_npoints
-        self.master.cw.f0_cv.track_npoints = new_track_npoints
-        for i in range(len(TDD.TRACKS)):
-            TDD.TRACKS[i].changeNoPoints(new_track_npoints)
-        TDD.F0_TRACK[0].changeNoPoints(new_track_npoints)
-        waveform, fs, dur = self.getCurrentWaveform()  
-        self.pushDisplayUpdates(waveform, fs, dur)
         
     @pyqtSlot()
-    def changeBubble(self, *arg, **kwarg):
+    def enableBubble(self, *arg, **kwarg):
         if self.master.displayDock.trackBubbleCheckBox.isChecked():
             TDD.CURRENT_PARAMS.track_bubble = True
         elif self.master.displayDock.trackBubbleCheckBox.isChecked():
             TDD.CURRENT_PARAMS.track_bubble = False
-            
+        
     @pyqtSlot()
-    def changeBubbleLen(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.bubble_len = self.master.displayDock.trackBubbleSlider.slider.value()
-            
+    def changeTracks(self, *arg, **kwarg):
+        TDD.CURRENT_PARAMS.bubble_len = self.master.displayDock.trackGroup.sliders["Bubble size"].value()
+        new_track_npoints = self.master.displayDock.trackGroup.sliders["Number of points"].value()
+        if new_track_npoints != TDD.CURRENT_PARAMS.track_npoints:
+            TDD.CURRENT_PARAMS.track_npoints = new_track_npoints
+            self.master.cw.spec_cv.track_npoints = new_track_npoints
+            self.master.cw.f0_cv.track_npoints = new_track_npoints
+            for i in range(len(TDD.TRACKS)):
+                TDD.TRACKS[i].changeNoPoints(new_track_npoints)
+            TDD.F0_TRACK[0].changeNoPoints(new_track_npoints)
+            waveform, fs, dur = self.getCurrentWaveform()  
+            self.pushDisplayUpdates(waveform, fs, dur)
+        
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
         """
@@ -245,18 +231,13 @@ class Slots:
             TDD.CURRENT_PARAMS.window_type = np.bartlett
         if curr_index == 2:
             TDD.CURRENT_PARAMS.window_type = np.blackman
-                        
+                
     @pyqtSlot()
-    def changeFrameSize(self, *arg, **kwarg):
-        """ Change spectrogram frame size. """
+    def changeSpectrogram(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.window_len =\
-                self.master.analysisDock.frameSizeGroup.currValue
-               
-    @pyqtSlot()
-    def changeOverlap(self, *arg, **kwarg):
-        """ Change percent of overlap in spectrogram frames. """
+            self.master.analysisDock.spectrogramGroup.sliders["Frame size"].value()
         TDD.CURRENT_PARAMS.noverlap =\
-                self.master.analysisDock.overlapGroup.currValue*0.01
+            self.master.analysisDock.spectrogramGroup.sliders["Frame overlap"].value()/100
         
     @pyqtSlot()
     def changeSTFTSize(self, *arg, **kwarg):

@@ -451,15 +451,14 @@ class DisplayDock(QDockWidget):
         self.clearButton.setStatusTip("Clear all plots")
         ###
         
-        ### track_npoints slider
-        self.track_npointsGroup = SliderGroup(label="Number of track points:",
-                units="points", minimum=20, maximum=80, stepDouble=False, 
-                value=40)
-        ###
-        self.trackBubbleSlider = SliderGroup(label="Length of track bubbles:",
-                units="Hz", minimum=50, maximum=500, stepDouble=False,
-                value=DEFAULT_PARAMS.bubble_len)
-        self.trackBubbleSlider.slider.setValue(DEFAULT_PARAMS.bubble_len)
+        self.trackGroup = SliderGroup2(\
+                keys=["Number of points", "Bubble size"],
+                units=["", "Hz"],
+                mins=[20, 50],
+                maxs=[100, 500],
+                values=[DEFAULT_PARAMS.track_npoints,
+                       DEFAULT_PARAMS.bubble_len])
+        
         self.trackBubbleCheckBox = QCheckBox("Use track bubbles")
         self.trackBubbleCheckBox.setChecked(False)
 
@@ -473,8 +472,7 @@ class DisplayDock(QDockWidget):
         mainVBox.addWidget(self.STFTCheckBox)
         mainVBox.addWidget(self.showFTCheckBox)
         mainVBox.addWidget(self.clearButton)
-        mainVBox.addWidget(self.track_npointsGroup)
-        mainVBox.addWidget(self.trackBubbleSlider)
+        mainVBox.addWidget(self.trackGroup)
         mainVBox.addWidget(self.trackBubbleCheckBox)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
@@ -550,25 +548,18 @@ class AnalysisDock(QDockWidget):
         windowVBox.addWidget(windowLabel)
         windowVBox.addWidget(self.windowComboBox)
         
-        self.frameSizeGroup = SliderGroup(label="Specgram Frame size:", units="samples",
-                minimum=5, maximum=10, stepDouble=True, value=8)
-
-        self.overlapGroup = SliderGroup(label="Specgram Frame overlap:", units="%",
-                minimum=5, maximum=15, stepSize=5, value=10)
-
-        self.thresholdGroup = SliderGroup(label="Specgram threshold:", units="dB",
-                minimum=0, maximum=10, stepSize=1, value=3)
-        
-        self.stftSizeGroup = SliderGroup(label="STFT frame size:", units="samples",
-                minimum=5, maximum=10, stepDouble=True, value=6)
+        self.spectrogramGroup = SliderGroup2(\
+                keys=["Frame size", "Frame overlap", "Threshold"],
+                units=["Samples", "%", "dB"],
+                mins=[64, 0, 0],
+                maxs=[1024, 99, 10],
+                values=[DEFAULT_PARAMS.window_len, DEFAULT_PARAMS.noverlap,
+                        DEFAULT_PARAMS.threshold])
 
         reassignCheckBox = QCheckBox("T-F reassignment")
 
         specVBox.addWidget(windowGroup)
-        specVBox.addWidget(self.frameSizeGroup)
-        specVBox.addWidget(self.overlapGroup)
-        specVBox.addWidget(self.thresholdGroup)
-        specVBox.addWidget(self.stftSizeGroup)
+        specVBox.addWidget(self.spectrogramGroup)
         specVBox.addWidget(reassignCheckBox)
         ###
 

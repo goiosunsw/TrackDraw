@@ -82,7 +82,7 @@ class Parameters:
                        AF=0,
                        resample_fs=10000,
                        synth_fs=10000,
-                       track_npoints=40,
+                       track_npoints=80,
                        window_len=256,
                        window_type=np.hamming,
                        noverlap=0.5,
@@ -94,7 +94,8 @@ class Parameters:
                        nformant=5,
                        stft_size=64,
                        track_bubble=False,
-                       bubble_len=250):
+                       bubble_len=250,
+                       threshold=0):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
@@ -117,6 +118,7 @@ class Parameters:
         self.stft_size = stft_size
         self.track_bubble = track_bubble
         self.bubble_len = bubble_len
+        self.threshold = threshold
         
         
 DEFAULT_PARAMS = Parameters()
