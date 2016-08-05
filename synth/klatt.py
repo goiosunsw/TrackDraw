@@ -125,6 +125,10 @@ class Klatt_Synth:
         inv_samp (integer) -- length of each interval in samples
         av (float) -- amplitude of voicing, dB
         avs (float) -- amplitude of quasi-sinusoidal voicing, dB
+        fgp (float) -- center frequency of glottal pole resonator, Hz
+        bgp (float) -- bandwidth of glottal pole resonator, Hz
+        fgz (float) -- center frequency of glottal zero resonator, Hz
+        bgz (float) -- bandwidth of glottal zero resonator, Hz
     
     To generate a waveform from a Klatt_Synth object using the parameters
     provided to it, call its synth() method.
@@ -155,9 +159,13 @@ class Klatt_Synth:
     methods (and thus while components have their own input and output vectors,
     sections only have output vectors). 
     
-    TODO -- add AV/AVS input dB values
-    TODO -- Add other sections (noise source and parallel branch)
-    TODO -- Optimize
+    TODO -- Optimize: need to replace all recursive filters with Cython code,
+        need to replace all non-recursive filters/summations with maps or
+        list comprehensions.
+    TODO -- Standardize the control scheme more appropriately
+    TODO -- upgrade input_connect system, need something that can accomodate
+        multiple inputs that go to different components in a clear way, need
+        something that can accomodate multiple outputs at the section level
     """
     def __init__(self, f0, ff, bw, fs, n_inv, n_form, inv_samp,
                  av=0, af=0, ah=0, avs=0, fgp=0, bgp=100, fgz=1500, bgz=6000,
@@ -311,7 +319,7 @@ class Klatt_Noise(Klatt_Section):
     """
     def __init__(self, master):
         Klatt_Section.__init__(self, master)
-        self.offset = 100 #dB
+        self.offset = 100
         self.noise = Noise(master=self.master)
         self.lp = Lowpass(master=self.master, input_connect=[self.noise])
         self.ah = Amplifier(master=self.master, input_connect=[self.lp])
