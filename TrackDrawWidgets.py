@@ -412,6 +412,10 @@ class DisplayDock(QDockWidget):
         clearButton (QButton) -- if pressed, all plots are cleared.
         track_npointsGroup (SliderGroup) -- slider which allows the number of
             points in the tracks to vary.
+        trackBubbleSlider (SliderGroup) -- slider which allows the length of
+            track bubbles to vary.
+        trackBubbleCheckBox (QCheckBox) -- checkbox which allows track bubbles
+            to be enabled or disabled.
         
             
     DisplayDock stores all user intefaces mechanisms that allow for changing
@@ -452,6 +456,12 @@ class DisplayDock(QDockWidget):
                 units="points", minimum=20, maximum=80, stepDouble=False, 
                 value=40)
         ###
+        self.trackBubbleSlider = SliderGroup(label="Length of track bubbles:",
+                units="Hz", minimum=50, maximum=500, stepDouble=False,
+                value=DEFAULT_PARAMS.bubble_len)
+        self.trackBubbleSlider.slider.setValue(DEFAULT_PARAMS.bubble_len)
+        self.trackBubbleCheckBox = QCheckBox("Use track bubbles")
+        self.trackBubbleCheckBox.setChecked(False)
 
         ### Set up main widget
         mainWidget = QWidget()
@@ -464,6 +474,8 @@ class DisplayDock(QDockWidget):
         mainVBox.addWidget(self.showFTCheckBox)
         mainVBox.addWidget(self.clearButton)
         mainVBox.addWidget(self.track_npointsGroup)
+        mainVBox.addWidget(self.trackBubbleSlider)
+        mainVBox.addWidget(self.trackBubbleCheckBox)
         mainVBox.addStretch()
         self.setWidget(mainWidget)
 
@@ -671,37 +683,28 @@ class SynthesisDock(QDockWidget):
         voicingGroup = QWidget()
         voicingVBox = QVBoxLayout()
         voicingGroup.setLayout(voicingVBox)        
-        self.avSlider = SliderGroup(label="Amplitude of Voicing:", units="dB",
-                                    minimum=-40, maximum=40,
-                                    value=DEFAULT_PARAMS.AV)
-        self.avsSlider = SliderGroup(label="Amplitude of QS Voicing", units="dB",
-                                     minimum=-40, maximum=40,
-                                     value=DEFAULT_PARAMS.AVS)
-        self.ahSlider = SliderGroup(label="Amplitude of Aspiration", units="dB",
-                                    minimum=-40, maximum=40,
-                                    value=DEFAULT_PARAMS.AH)
-        voicingVBox.addWidget(self.avSlider)
-        voicingVBox.addWidget(self.avsSlider)
-        voicingVBox.addWidget(self.ahSlider)
+        
+        self.amplitudeGroup = SliderGroup2(\
+                keys=["Amplitude of voicing", "Amplitude of QS voicing",
+                      "Amplitude of aspiration", "Amplitude of frication"],
+                units=["dB", "dB", "dB", "dB"],
+                mins=[0, 0, 0, 0],
+                maxs=[40, 40, 40, 40],
+                values=[DEFAULT_PARAMS.AV, DEFAULT_PARAMS.AVS,
+                        DEFAULT_PARAMS.AH, DEFAULT_PARAMS.AF])
 
         self.FFBandwidthGroup = SliderGroup2(\
-                labels=["F1 bandwidth:", "F2 bandwidth:", "F3 bandwidth:",
-                       "F4 bandwidth:", "F5 bandwidth:"],
+                keys=["F1 bandwidth", "F2 bandwidth", "F3 bandwidth",
+                       "F4 bandwidth", "F5 bandwidth"],
                 units=["Hz", "Hz", "Hz", "Hz", "Hz"],
-                mins=[10, 10, 10, 10, 10],
-                maxs=[50, 50, 50, 50, 50],
-                values=[DEFAULT_PARAMS.BW[0]/5, DEFAULT_PARAMS.BW[1]/5,
-                        DEFAULT_PARAMS.BW[2]/5, DEFAULT_PARAMS.BW[3]/5,
-                        DEFAULT_PARAMS.BW[4]/5],
-                stepSizes=[5, 5, 5, 5, 5],
-                stepDoubles=[False, False, False, False, False])
+                mins=[50, 50, 10, 50, 50],
+                maxs=[250, 250, 250, 250, 250],
+                values=[DEFAULT_PARAMS.BW[0], DEFAULT_PARAMS.BW[1],
+                        DEFAULT_PARAMS.BW[2], DEFAULT_PARAMS.BW[3],
+                        DEFAULT_PARAMS.BW[4]])
 
         klattVBox.addWidget(voicingGroup)
-        #klattVBox.addWidget(F1BandwidthGroup)
-        #klattVBox.addWidget(F2BandwidthGroup)
-        #klattVBox.addWidget(F3BandwidthGroup)
-        #klattVBox.addWidget(F4BandwidthGroup)
-        #klattVBox.addWidget(F5BandwidthGroup)
+        klattVBox.addWidget(self.amplitudeGroup)
         klattVBox.addWidget(self.FFBandwidthGroup)
         ###
 
@@ -798,56 +801,52 @@ class SliderGroup(QWidget):
                   + " " + self.unitsTxt
         self.topLabel.setText(newTopTxt)
 
-
+        
 class SliderGroup2(QWidget):
-    """
-    A convenience widget for displaying slider information (minimum, maximum,
-    and current value). Set stepDouble=True to create a slider that doubles
-    its value each step.
     
-    TODO -- fix slider updates, I think I may have commented out the slider
-    update method because I was having issues with it a while back... 08/03 DG
-    """
-    def __init__(self, labels, units, mins, maxs, values, stepSizes,
-            stepDoubles, parent=None, slots=None):
+    def __init__(self, keys, units, mins, maxs, values,
+                 parent=None, slots=None):
         super(SliderGroup2, self).__init__(parent)
         SliderGrid = QGridLayout()
         self.setLayout(SliderGrid)
 
-        self.sliders = []
-
-        for i in range(len(labels)):
-            self.stepSize = stepSizes[i]
-            self.stepDouble = stepDoubles[i]
-            if stepDoubles[i]:
-                self.currValue = 2**values[i]
-                minLabel = QLabel(str(2**mins[i]))
-                maxLabel = QLabel(str(2**maxs[i]))
-            else:
-                self.currValue = self.stepSize*values[i]
-                minLabel = QLabel(str(self.stepSize*mins[i]))
-                maxLabel = QLabel(str(self.stepSize*maxs[i]))
-
-            self.labelTxt = labels[i]
-            self.unitsTxt = units[i]
-            self.topLabel = QLabel(self.labelTxt + "  " + str(self.currValue)\
-                          + " " + self.unitsTxt)
-            self.sliders.append(QSlider(minimum=mins[i], maximum=maxs[i],
-                    value=values[i], orientation=Qt.Horizontal))
-#            self.sliders[i].connect(self.updateValueLabel)
-
-            SliderGrid.addWidget(self.topLabel,  2*i, 0, 1, 3)
-            SliderGrid.addWidget(minLabel,  2*i + 1, 0)
-            SliderGrid.addWidget(self.sliders[i], 2*i + 1, 1)
-            SliderGrid.addWidget(maxLabel,  2*i + 1, 2)
-
-#    @pyqtSlot()
-#    def updateValueLabel(self):
-#        if self.stepDouble:
-#            self.currValue = 2**self.botSlider.value()
-#        else:
-#            currValue = self.stepSize*self.botSlider.value()
-#        newTopTxt = self.labelTxt + "  " + str(self.currValue)\
-#                  + " " + self.unitsTxt
-#        self.topLabel.setText(newTopTxt)
+        self.keys = []
+        self.sliders = {}
+        self.callbacks = {}
+        self.values = {}
+        self.labelTxt = {}
+        self.unitTxt = {}
+        self.unitsTxt = {}
+        self.topLabel = {}
+        self.minLabel = {}
+        self.maxLabel = {}
+            
+        for i in range(len(keys)):
+            self.keys.append(keys[i])
+            self.labelTxt[self.keys[i]] = self.keys[i] + ":"
+            self.unitTxt[self.keys[i]] = units[i]
+            self.values[self.keys[i]] = values[i]
+            self.topLabel[self.keys[i]] = QLabel(self.labelTxt[self.keys[i]]
+                                                 + " "
+                                                 + str(self.values[self.keys[i]])
+                                                 + " "
+                                                 + self.unitTxt[self.keys[i]])
+            self.minLabel[self.keys[i]] = QLabel(str(mins[i]))
+            self.maxLabel[self.keys[i]] = QLabel(str(maxs[i]))
+            self.sliders[self.keys[i]] = QSlider(minimum=mins[i], maximum=maxs[i],
+                                                 value=values[i],
+                                                 orientation=Qt.Horizontal)
+            self.callbacks[self.keys[i]] = partial(self.updateValueLabel,
+                                                    sliderKey=self.keys[i])
+            self.sliders[self.keys[i]].valueChanged.connect(self.callbacks[self.keys[i]])
+            self.sliders[self.keys[i]].setValue(self.values[self.keys[i]])
+            SliderGrid.addWidget(self.topLabel[self.keys[i]], 2*i, 0, 1, 3)
+            SliderGrid.addWidget(self.minLabel[self.keys[i]], 2*i + 1, 0)
+            SliderGrid.addWidget(self.sliders[self.keys[i]], 2*i + 1, 1)
+            SliderGrid.addWidget(self.maxLabel[self.keys[i]], 2*i + 1, 2)
+            
+    @pyqtSlot()
+    def updateValueLabel(self, sliderKey=None):
+        newTopTxt = self.labelTxt[sliderKey] + " " + str(self.sliders[sliderKey].value()) + " " + self.unitTxt[sliderKey]
+        self.topLabel[sliderKey].setText(newTopTxt)
 

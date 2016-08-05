@@ -78,7 +78,8 @@ class Parameters:
                        BW=np.array([50, 100, 100, 200, 250]),
                        AV=0,
                        AVS=0,
-                       AH=-20,
+                       AH=0,
+                       AF=0,
                        resample_fs=10000,
                        synth_fs=10000,
                        track_npoints=40,
@@ -91,13 +92,16 @@ class Parameters:
                        radiation=0,
                        synth_type="Klatt 1980",
                        nformant=5,
-                       stft_size=64):
+                       stft_size=64,
+                       track_bubble=False,
+                       bubble_len=250):
         self.F0 = F0
         self.FF = FF
         self.BW = BW
         self.AV = AV
         self.AVS = AVS
         self.AH = AH
+        self.AF = AF
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints
@@ -111,6 +115,8 @@ class Parameters:
         self.synth_type = synth_type
         self.nformant = nformant
         self.stft_size = stft_size
+        self.track_bubble = track_bubble
+        self.bubble_len = bubble_len
         
         
 DEFAULT_PARAMS = Parameters()

@@ -37,6 +37,8 @@ class MainWindow(QMainWindow):
         changeNoTracks = partial(slots.changeNoTracks)
         self.onResize = partial(slots.onResize)
         changeNoPoints = partial(slots.changeNoPoints)
+        changeBubble = partial(slots.changeBubble)
+        changeBubbleLen = partial(slots.changeBubbleLen)
         
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
@@ -47,9 +49,7 @@ class MainWindow(QMainWindow):
         synthesize = partial(slots.synthesize)
         changeBW = partial(slots.changeBW)
         changeSynth = partial(slots.changeSynth)
-        changeAV = partial(slots.changeAV)
-        changeAVS = partial(slots.changeAVS)
-        changeAH = partial(slots.changeAH)
+        changeAmplitude = partial(slots.changeAmplitude)
         
         play = partial(slots.play)
         ##### End callbacks setup #####
@@ -131,13 +131,17 @@ class MainWindow(QMainWindow):
         ##### Sliders #####
         self.analysisDock.frameSizeGroup.slider.valueChanged.connect(changeFrameSize)
         self.analysisDock.overlapGroup.slider.valueChanged.connect(changeOverlap)
+        keys = ["F1 bandwidth", "F2 bandwidth", "F3 bandwidth", "F4 bandwidth",
+                "F5 bandwidth"]
         for i in range(5):
-            self.synthesisDock.FFBandwidthGroup.sliders[i].valueChanged.connect(changeBW)
+            self.synthesisDock.FFBandwidthGroup.sliders[keys[i]].valueChanged.connect(changeBW)
         self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
         self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
-        self.synthesisDock.avSlider.slider.valueChanged.connect(changeAV)
-        self.synthesisDock.avsSlider.slider.valueChanged.connect(changeAVS)
-        self.synthesisDock.ahSlider.slider.valueChanged.connect(changeAH)
+        self.displayDock.trackBubbleSlider.slider.valueChanged.connect(changeBubbleLen)
+        keys = ["Amplitude of voicing", "Amplitude of QS voicing",
+                "Amplitude of aspiration", "Amplitude of frication"]
+        for i in range(4):
+            self.synthesisDock.amplitudeGroup.sliders[keys[i]].valueChanged.connect(changeAmplitude)
         ##### End sliders setup #####
         
         ##### Buttons #####
@@ -148,6 +152,7 @@ class MainWindow(QMainWindow):
         self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
         self.displayDock.showFTCheckBox.stateChanged.connect(enableTracks)
         self.displayDock.STFTCheckBox.stateChanged.connect(enableSTFT)
+        self.displayDock.trackBubbleCheckBox.stateChanged.connect(changeBubble)
         ##### End buttons setup #####
         
         ##### Canvases #####

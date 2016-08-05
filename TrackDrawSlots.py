@@ -123,8 +123,10 @@ class Slots:
         """
         if self.master.displayDock.STFTCheckBox.checkState() == 0:
             self.master.cw.stft_cv.setHidden(True)
+            self.master.cw.stft_cv.enabled = False
         else:
             self.master.cw.stft_cv.setHidden(False)
+            self.master.cw.stft_cv.enabled = True
             
     @pyqtSlot()
     def changeNoTracks(self, curr_index, *arg, **kwarg):
@@ -182,6 +184,17 @@ class Slots:
         TDD.F0_TRACK[0].changeNoPoints(new_track_npoints)
         waveform, fs, dur = self.getCurrentWaveform()  
         self.pushDisplayUpdates(waveform, fs, dur)
+        
+    @pyqtSlot()
+    def changeBubble(self, *arg, **kwarg):
+        if self.master.displayDock.trackBubbleCheckBox.isChecked():
+            TDD.CURRENT_PARAMS.track_bubble = True
+        elif self.master.displayDock.trackBubbleCheckBox.isChecked():
+            TDD.CURRENT_PARAMS.track_bubble = False
+            
+    @pyqtSlot()
+    def changeBubbleLen(self, *arg, **kwarg):
+        TDD.CURRENT_PARAMS.bubble_len = self.master.displayDock.trackBubbleSlider.slider.value()
             
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
@@ -282,22 +295,29 @@ class Slots:
             
     @pyqtSlot()
     def changeBW(self, *arg, **kwarg):
-        """ Updates formant bandwidth values when sliders are used. """
+        """
+        Updates formant bandwidth values when sliders are used.
+        
+        TODO -- figure out where to store slider keys? 
+        """
+        keys = ["F1 bandwidth", "F2 bandwidth", "F3 bandwidth", "F4 bandwidth",
+                "F5 bandwidth"]
         for i in range(5):
             TDD.CURRENT_PARAMS.BW[i] =\
-                 self.master.synthesisDock.FFBandwidthGroup.sliders[i].value()*5
-    
+                 self.master.synthesisDock.FFBandwidthGroup.sliders[keys[i]].value()
+ 
     @pyqtSlot()
-    def changeAV(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.AV = self.master.synthesisDock.avSlider.slider.value()
-        
-    @pyqtSlot()
-    def changeAVS(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.AVS = self.master.synthesisDock.avsSlider.slider.value()
-        
-    @pyqtSlot()
-    def changeAH(self, *arg, **kwarg):
-        TDD.CURRENT_PARAMS.AH = self.master.synthesisDock.ahSlider.slider.value()
+    def changeAmplitude(self, *arg, **kwarg):
+        keys = ["Amplitude of voicing", "Amplitude of QS voicing",
+                "Amplitude of aspiration", "Amplitude of frication"]
+        TDD.CURRENT_PARAMS.AV =\
+            self.master.synthesisDock.amplitudeGroup.sliders[keys[0]].value()
+        TDD.CURRENT_PARAMS.AVS =\
+            self.master.synthesisDock.amplitudeGroup.sliders[keys[1]].value()
+        TDD.CURRENT_PARAMS.AH =\
+            self.master.synthesisDock.amplitudeGroup.sliders[keys[2]].value()
+        TDD.CURRENT_PARAMS.AF =\
+            self.master.synthesisDock.amplitudeGroup.sliders[keys[3]].value()
         
     @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
@@ -384,66 +404,79 @@ class Slots:
             applied. See main.py for some helpful code to make those as well as
             the deprecated mouse_shift() slot below.
         TODO -- beautify the code, it's kinda ugly...
+        TODO -- add track bubble features
         """
         event = list(arg)[0]
         x_loc = None
         y_loc = None
-        # If mouse button is down, perform track updates
-        if event.button:
-            try:
-                # Extract variables from kwarg
-                plot = kwarg["plot"]
-                target = kwarg["target"]
-                wasClick = kwarg["wasClick"]
-                x_loc, y_loc = plot.mouse(event)
-                # Get correct tracks
-                if target == "F0":
-                    tracks = TDD.F0_TRACK
-                elif target == "FF":
-                    tracks = TDD.TRACKS
-                # Find nearest x index
-                dist_to_x_pts = np.abs(np.linspace(0,
-                                       TDD.CURRENT_PARAMS.track_npoints-1,
-                                       TDD.CURRENT_PARAMS.track_npoints) - x_loc)
-                nearest_x_idx = dist_to_x_pts.argmin()
-                if wasClick == True:
-                    y_coords_at_nearest_x = np.array([track.points[nearest_x_idx]
-                                                      for track in tracks])
-                    dist_to_y_points = np.abs(y_coords_at_nearest_x - y_loc)
-                    trackNo = dist_to_y_points.argmin()
-                    plot.locked_track = trackNo
-                    tracks[trackNo].points[nearest_x_idx] = y_loc
-                    plot.updateCanvas(tracks, trackNo)
-                elif wasClick == False:
-                    tracks[plot.locked_track].points[nearest_x_idx] = y_loc
-                    plot.updateCanvas(tracks, plot.locked_track)
-            except TypeError:
-                pass
-        # Even if mouse button is not down, still update STFT display
-        else:
-            try:
-                plot = kwarg["plot"]
-                target = kwarg["target"]
-                wasClick = kwarg["wasClick"]
-                x_loc, y_loc = plot.mouse(event)
-            except TypeError:
-                pass
-        waveform, fs, dur = self.getCurrentWaveform()
-        if x_loc == None:
-            try:
-                x_loc, y_loc = plot.mouse(event)
-            except TypeError:
-                pass
+        plot=kwarg["plot"]
+        target=kwarg["target"]
+        wasClick=kwarg["wasClick"]
         try:
-            x_loc = x_loc/TDD.CURRENT_PARAMS.track_npoints
-            x_loc = int(x_loc*dur*fs)
-            if TDD.CURRENT_PARAMS.stft_size < x_loc < round(fs*dur)-TDD.CURRENT_PARAMS.stft_size:
-                waveform = waveform/np.max(np.abs(waveform))
-                magnitude = np.fft.rfft(waveform[x_loc-TDD.CURRENT_PARAMS.stft_size:x_loc+TDD.CURRENT_PARAMS.stft_size])
-                magnitude = 20*np.log10(np.abs(magnitude))
-                self.master.cw.stft_cv.update_stft(magnitude)
+            x_loc, y_loc = plot.mouse(event)
         except TypeError:
             pass
+        if event.button and x_loc != None:
+            # Get correct tracks
+            if target == "F0":
+                tracks = TDD.F0_TRACK
+            elif target == "FF":
+                tracks = TDD.TRACKS
+            # Find nearest x index
+            dist_to_x_pts = np.abs(np.linspace(0,
+                                   TDD.CURRENT_PARAMS.track_npoints-1,
+                                   TDD.CURRENT_PARAMS.track_npoints)-x_loc)
+            nearest_x_idx = dist_to_x_pts.argmin()
+            # Grab y coordinates from all lines at that x index
+            y_coords_at_nearest_x = np.array([track.points[nearest_x_idx]
+                                              for track in tracks])
+            # Find the nearest one
+            dist_to_y_points = np.abs(y_coords_at_nearest_x - y_loc)
+            trackNo = dist_to_y_points.argmin()
+            # Update selected track if was a click
+            if wasClick == True:
+                plot.locked_track = trackNo
+            # Check for track bubbles and handle that logic if necessary
+            if TDD.CURRENT_PARAMS.track_bubble == True and len(tracks) > 1:
+                if y_coords_at_nearest_x[plot.locked_track] < y_loc:
+                    try:
+                        val_above = y_coords_at_nearest_x[plot.locked_track + 1] 
+                        difference = abs(val_above - y_loc)
+                        if difference <= TDD.CURRENT_PARAMS.bubble_len:
+                            tracks[plot.locked_track].points[nearest_x_idx] =\
+                                    val_above - TDD.CURRENT_PARAMS.bubble_len
+                        else:
+                            tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+                    except IndexError:
+                        tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+                if y_coords_at_nearest_x[plot.locked_track] > y_loc:
+                    try:
+                        val_below = y_coords_at_nearest_x[plot.locked_track - 1]
+                        difference = abs(val_below - y_loc)
+                        if difference <= TDD.CURRENT_PARAMS.bubble_len:
+                            tracks[plot.locked_track].points[nearest_x_idx] =\
+                                    val_below + TDD.CURRENT_PARAMS.bubble_len
+                        else:
+                            tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+                    except IndexError:
+                        tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+            else:
+                tracks[plot.locked_track].points[nearest_x_idx] = y_loc
+            plot.updateCanvas(tracks, plot.locked_track)
+        if self.master.cw.stft_cv.enabled == True:
+            waveform, fs, dur = self.getCurrentWaveform()
+            try:
+                x_loc = x_loc/TDD.CURRENT_PARAMS.track_npoints
+                x_loc = int(x_loc*dur*fs)
+                if TDD.CURRENT_PARAMS.stft_size < x_loc < round(fs*dur)\
+                        -TDD.CURRENT_PARAMS.stft_size:
+                    waveform = waveform/np.max(np.abs(waveform))
+                    magnitude = np.fft.rfft(waveform[x_loc-TDD.CURRENT_PARAMS.stft_size:x_loc
+                                                     +TDD.CURRENT_PARAMS.stft_size])
+                    magnitude = 20*np.log10(np.abs(magnitude))
+                    self.master.cw.stft_cv.update_stft(magnitude)
+            except TypeError:
+                pass
         
     @pyqtSlot()
     def mouse_ctrl(self, *arg, **kwarg):
