@@ -410,10 +410,8 @@ class DisplayDock(QDockWidget):
         STFTCheckBox (QCheckBox) -- if checked, stft_cv is shown.
         showFTCheckBox (QCheckBox) -- if checked, formant tracks are shown.
         clearButton (QButton) -- if pressed, all plots are cleared.
-        track_npointsGroup (SliderGroup) -- slider which allows the number of
-            points in the tracks to vary.
-        trackBubbleSlider (SliderGroup) -- slider which allows the length of
-            track bubbles to vary.
+        trackGroup (SliderGroup2) -- group of sliders to control various track
+            parameters. 
         trackBubbleCheckBox (QCheckBox) -- checkbox which allows track bubbles
             to be enabled or disabled.
         
@@ -492,14 +490,8 @@ class AnalysisDock(QDockWidget):
             spectrogram parameters.
         windowComboBox (QComboBox) -- combobox which allows user to select the
             type of window to use in the spectrogram, part of specGroup.
-        frameSizeGroup (SliderGroup) -- slider which allows user to select the
-            length of the frame to use in the spectrogram, part of specGroup.
-        overlapGroup (SliderGroup) -- slider which allows user to select the
-            amount of overlap in the frames in the spectrogram, part of
-            specGroup.
-        thresholdGroup (SliderGroup) -- slider which allows user to select the
-            amount of thresholding to perform on the magnitude spectra returned
-            by the spectrogram function, part of specGroup.
+        spectrogramGroup (SliderGroup2) -- group of sliders to control various
+            spectrogram parameters.
         waveletGroup (QGroupBox) -- groupbox containing the user interface for
             wavelet analysis parameters.
         applyButton (QButton) -- button which applies any updated analysis.
@@ -619,9 +611,8 @@ class SynthesisDock(QDockWidget):
             number of formants to be synthesized.
         klattGroup (QGroupBox) -- groupbox for Klatt synthesizer parameters
         sineGroup (QGroupBox) -- groupbox for Sine wave synthesizer parameters
-        avSlider (SliderGroup) -- slider to control AV (amplitude of voicing)
-        avsSlider (SliderGroup) -- slider to control AVS (amplitude of quasi-
-            sinusoidal voicing)
+        amplitudeGroup (SliderGroup2) -- group of sliders to control different
+            amplifier parameters in the Klatt synthesizer.
         FFBandwidthGroup (SliderGroup2) -- group of sliders to allow for
             selection formant bandwidths to be synthesized.
         synthButton (QButton) -- button for initiating synthesis using current

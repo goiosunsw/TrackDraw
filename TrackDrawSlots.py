@@ -65,16 +65,43 @@ class Slots:
     def applyDefaults(self, *arg, **kwarg):
         """
         Restores all parameters to default values.
-        
-        TODO -- reflect it in the UI? 
         """
+        # Reset params
         TDD.CURRENT_PARAMS = copy.deepcopy(TDD.DEFAULT_PARAMS)
+        # Reset tracks
         F0 = TDD.DEFAULT_PARAMS.F0
         allFF = TDD.DEFAULT_PARAMS.FF
         TDD.F0_TRACK =  [TDD.Track(F0*np.ones([TDD.DEFAULT_PARAMS.track_npoints]))]
         TDD.TRACKS   = [TDD.Track(FF*np.ones([TDD.DEFAULT_PARAMS.track_npoints])) for FF in allFF]
         self.master.cw.spec_cv.start(TDD.TRACKS)
         self.master.cw.f0_cv.start(TDD.F0_TRACK)
+        # Reset sliders
+        keys = self.master.displayDock.trackGroup.keys
+        for i in range(len(keys)):
+            self.master.displayDock.trackGroup.sliders[keys[i]].setValue(
+                self.master.displayDock.trackGroup.values[keys[i]])
+        keys = self.master.analysisDock.spectrogramGroup.keys
+        for i in range(len(keys)):
+            self.master.analysisDock.spectrogramGroup.sliders[keys[i]].setValue(
+                self.master.analysisDock.spectrogramGroup.values[keys[i]])
+        keys = self.master.synthesisDock.amplitudeGroup.keys
+        for i in range(len(keys)):
+            self.master.synthesisDock.amplitudeGroup.sliders[keys[i]].setValue(
+                self.master.synthesisDock.amplitudeGroup.values[keys[i]])
+        keys = self.master.synthesisDock.FFBandwidthGroup.keys
+        for i in range(len(keys)):
+            self.master.synthesisDock.FFBandwidthGroup.sliders[keys[i]].setValue(
+                self.master.synthesisDock.FFBandwidthGroup.values[keys[i]])
+        # Reset buttons and comboboxes
+        self.master.displayDock.loadedRadioButton.setChecked(True)
+        self.master.displayDock.waveCheckBox.setChecked(True)
+        self.master.displayDock.STFTCheckBox.setChecked(True)
+        self.master.displayDock.showFTCheckBox.setChecked(True)
+        self.master.displayDock.trackBubbleCheckBox.setChecked(False)
+        self.master.analysisDock.methodComboBox.setCurrentIndex(0)
+        self.master.analysisDock.windowComboBox.setCurrentIndex(0)
+        self.master.synthesisDock.methodComboBox.setCurrentIndex(0)
+        self.master.synthesisDock.nformantComboBox.setCurrentIndex(4)
     ##### End misc slots #####
     
     
