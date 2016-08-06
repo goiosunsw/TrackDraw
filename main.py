@@ -36,18 +36,18 @@ class MainWindow(QMainWindow):
         enableSTFT = partial(slots.enableSTFT)
         changeNoTracks = partial(slots.changeNoTracks)
         self.onResize = partial(slots.onResize)
-        changeNoPoints = partial(slots.changeNoPoints)
+        changeTracks = partial(slots.changeTracks)
+        enableBubble = partial(slots.enableBubble)
         
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
-        changeFrameSize = partial(slots.changeFrameSize)
-        changeOverlap = partial(slots.changeOverlap)
+        changeSpectrogram = partial(slots.changeSpectrogram)
         changeSTFTSize = partial(slots.changeSTFTSize)
         
         synthesize = partial(slots.synthesize)
         changeBW = partial(slots.changeBW)
         changeSynth = partial(slots.changeSynth)
-        changeSource = partial(slots.changeSource)
+        changeAmplitude = partial(slots.changeAmplitude)
         
         play = partial(slots.play)
         ##### End callbacks setup #####
@@ -124,16 +124,23 @@ class MainWindow(QMainWindow):
         self.analysisDock.windowComboBox.activated.connect(changeWindow)
         self.synthesisDock.methodComboBox.activated.connect(changeSynth)
         self.synthesisDock.nformantComboBox.activated.connect(changeNoTracks)
-        self.synthesisDock.voicingComboBox.activated.connect(changeSource)
         #### End Combo Boxes Setup #####
         
         ##### Sliders #####
-        self.analysisDock.frameSizeGroup.slider.valueChanged.connect(changeFrameSize)
-        self.analysisDock.overlapGroup.slider.valueChanged.connect(changeOverlap)
+        keys = ["Frame size", "Frame overlap", "Threshold"]
+        for i in range(3):
+            self.analysisDock.spectrogramGroup.sliders[keys[i]].valueChanged.connect(changeSpectrogram)
+        keys = ["F1 bandwidth", "F2 bandwidth", "F3 bandwidth", "F4 bandwidth",
+                "F5 bandwidth"]
         for i in range(5):
-            self.synthesisDock.FFBandwidthGroup.sliders[i].valueChanged.connect(changeBW)
-        self.displayDock.track_npointsGroup.slider.valueChanged.connect(changeNoPoints)
-        self.analysisDock.stftSizeGroup.slider.valueChanged.connect(changeSTFTSize)
+            self.synthesisDock.FFBandwidthGroup.sliders[keys[i]].valueChanged.connect(changeBW)
+        keys = ["Number of points", "Bubble size"]
+        for i in range(2):
+            self.displayDock.trackGroup.sliders[keys[i]].valueChanged.connect(changeTracks)
+        keys = ["Amplitude of voicing", "Amplitude of QS voicing",
+                "Amplitude of aspiration", "Amplitude of frication"]
+        for i in range(4):
+            self.synthesisDock.amplitudeGroup.sliders[keys[i]].valueChanged.connect(changeAmplitude)
         ##### End sliders setup #####
         
         ##### Buttons #####
@@ -144,11 +151,14 @@ class MainWindow(QMainWindow):
         self.displayDock.waveCheckBox.stateChanged.connect(enableWave)
         self.displayDock.showFTCheckBox.stateChanged.connect(enableTracks)
         self.displayDock.STFTCheckBox.stateChanged.connect(enableSTFT)
+        self.displayDock.trackBubbleCheckBox.stateChanged.connect(enableBubble)
         ##### End buttons setup #####
         
         ##### Canvases #####
         click_f0 = partial(slots.mouse, wasClick=True, plot=self.cw.f0_cv, target="F0")
         drag_f0 = partial(slots.mouse, wasClick=False, plot=self.cw.f0_cv, target="F0")
+#        modifiers = QApplication.keyboardModifiers()
+#        if modifiers == Qt.ShiftModifier:
         self.cw.f0_cv.fig.canvas.mpl_connect('button_press_event', click_f0)
         self.cw.f0_cv.fig.canvas.mpl_connect('motion_notify_event', drag_f0)
         
@@ -184,8 +194,6 @@ def main():
     mainWindow = MainWindow()
     mainWindow.show()
     # Have to start canvasses here, otherwise they're the wrong size!!
-    # We may want to consider renaming them to something easier to use,
-    # but I'm not sure where they're referenced... DG 07/26
     mainWindow.cw.spec_cv.start(TDD.TRACKS)
     mainWindow.cw.f0_cv.start(TDD.F0_TRACK)
     mainWindow.cw.stft_cv.start()
