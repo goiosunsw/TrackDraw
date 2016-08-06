@@ -45,12 +45,14 @@ def klatt_make(parms):
     bw = parms.BW
     av = parms.AV
     avs = parms.AVS
+    ah = parms.AH
+    af = parms.AF
     fs = parms.synth_fs
     dur = parms.dur
-    y = klatt_bridge(f0, ff, bw, av, avs, fs, dur)
+    y = klatt_bridge(f0, ff, bw, av, avs, ah, af, fs, dur)
     return(y)
     
-def klatt_bridge(f0, ff, bw, av, avs, fs, dur, inv_samp=50):
+def klatt_bridge(f0, ff, bw, av, avs, ah, af, fs, dur, inv_samp=50):
     """
     Processes/interpolates input parameters for Klatt synth, runs synth.
     
@@ -104,7 +106,8 @@ def klatt_bridge(f0, ff, bw, av, avs, fs, dur, inv_samp=50):
                 interp_bw.append(interpolate(bw[i], n_inv))
     # Finally, create synth object, run it, and return its output waveform    
     synth = Klatt_Synth(f0=interp_f0, ff=interp_ff, bw=interp_bw, av=av, avs=avs,
-                        fs=fs, n_inv=n_inv, n_form=n_form, inv_samp=inv_samp)
+                        fs=fs, n_inv=n_inv, n_form=n_form, inv_samp=inv_samp,
+                        ah=ah, af=af)
     synth.synth()
     return(synth.output)
     
@@ -125,6 +128,10 @@ class Klatt_Synth:
         inv_samp (integer) -- length of each interval in samples
         av (float) -- amplitude of voicing, dB
         avs (float) -- amplitude of quasi-sinusoidal voicing, dB
+        fgp (float) -- center frequency of glottal pole resonator, Hz
+        bgp (float) -- bandwidth of glottal pole resonator, Hz
+        fgz (float) -- center frequency of glottal zero resonator, Hz
+        bgz (float) -- bandwidth of glottal zero resonator, Hz
     
     To generate a waveform from a Klatt_Synth object using the parameters
     provided to it, call its synth() method.
@@ -155,9 +162,13 @@ class Klatt_Synth:
     methods (and thus while components have their own input and output vectors,
     sections only have output vectors). 
     
-    TODO -- add AV/AVS input dB values
-    TODO -- Add other sections (noise source and parallel branch)
-    TODO -- Optimize
+    TODO -- Optimize: need to replace all recursive filters with Cython code,
+        need to replace all non-recursive filters/summations with maps or
+        list comprehensions.
+    TODO -- Standardize the control scheme more appropriately
+    TODO -- upgrade input_connect system, need something that can accomodate
+        multiple inputs that go to different components in a clear way, need
+        something that can accomodate multiple outputs at the section level
     """
     def __init__(self, f0, ff, bw, fs, n_inv, n_form, inv_samp,
                  av=0, af=0, ah=0, avs=0, fgp=0, bgp=100, fgz=1500, bgz=6000,
@@ -306,21 +317,19 @@ class Klatt_Noise(Klatt_Section):
             noise generator output. Right now, noise generator output is too
             loud compared to the voicing generator, so a 100 dB offset is
             applied.
-    
-    TODO -- figure out a way to split into separate outputs for AH and AF
     """
     def __init__(self, master):
         Klatt_Section.__init__(self, master)
-        self.offset = 100 #dB
+        self.offset = -100
         self.noise = Noise(master=self.master)
         self.lp = Lowpass(master=self.master, input_connect=[self.noise])
-        self.ah = Amplifier(master=self.master, input_connect=[self.lp])
+        self.temp_amp = Amplifier(master=self.master, input_connect=[self.lp])
         
     def run(self):
         self.noise.noise_gen()
         self.lp.filt()
-        self.ah.amplify(dB=(self.master.ah[self.master.current_inv]-self.offset))
-        self.output[:] = self.ah.output[:]
+        self.temp_amp.amplify(dB=self.offset)
+        self.output[:] = self.temp_amp.output[:]
 
 
 class Klatt_Cascade(Klatt_Section):
@@ -328,11 +337,17 @@ class Klatt_Cascade(Klatt_Section):
     Simulates a vocal tract with a cascade of resonators.
     
     Arguments:
-        input_connect (Klatt_Section object) -- see Klatt_Synth doc string.
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string. For
+        Klatt_Cascade, input_connect is expected to contain two sources to
+        excited the cascade. The first source is voicing, the second noise.
+        The first source should be sent directly to the mixer, the second goes
+        through ah first and then to the mixer.
     """
     def __init__(self, master, input_connect=None):
         Klatt_Section.__init__(self, master)
-        self.mixer = Mixer(master=self.master, input_connect=input_connect)
+        self.ah = Amplifier(master=self.master, input_connect=[input_connect[1]])
+        self.mixer = Mixer(master=self.master, input_connect=[input_connect[0],
+                                                              self.ah])
         self.rnp = Resonator(master=self.master, input_connect=[self.mixer])
         self.rnz = Resonator(master=self.master, input_connect=[self.rnp],
                              anti=True)
@@ -344,6 +359,7 @@ class Klatt_Cascade(Klatt_Section):
             previous_formant = self.formants[form]
 
     def run(self):
+        self.ah.amplify(self.master.ah[self.master.current_inv])
         self.mixer.mix()
         self.rnp.resonate(self.master.fnp[self.master.current_inv],
                           self.master.bnp[self.master.current_inv])
@@ -360,18 +376,24 @@ class Klatt_Parallel(Klatt_Section):
     Simulates a vocal tract with a set of parallel resonators.
     
     Arguments:
-        input_connect (Klatt_Section object) -- see Klatt_Synth doc string.
+        input_connect (Klatt_Section object) -- see Klatt_Synth doc string. For
+            Klatt_Paralell, input_connect is expected to contain two excitation
+            sources (voicing and noise), and they are handed to different
+            components. The voicing source is the 0-th source, and goes to
+            a1 and first_diff, while the noise source is the 1-th source and
+            goes to the mixer and the fifth/sixth formant.
             
     TODO -- figure out how to balance everything properly
     """
     def __init__(self, master, input_connect=None):
         Klatt_Section.__init__(self, master)
+        self.af = Amplifier(master=self.master, input_connect=[input_connect[1]])
         self.a1 = Amplifier(master=self.master, input_connect=[input_connect[0]])
         self.r1 = Resonator(master=self.master, input_connect=[self.a1])
         self.first_diff = First_Diff(master=self.master,
                                      input_connect=[input_connect[0]])
         self.mixer = Mixer(master=self.master,
-                           input_connect=[self.first_diff, input_connect[1]])
+                           input_connect=[self.first_diff, self.af])
         self.an = Amplifier(master=self.master, input_connect=[self.mixer])
         self.rnp = Resonator(master=self.master, input_connect=[self.an])
         self.a2 = Amplifier(master=self.master, input_connect=[self.mixer])
@@ -382,7 +404,8 @@ class Klatt_Parallel(Klatt_Section):
         self.r4 = Resonator(master=self.master, input_connect=[self.a4])
         self.a5 = Amplifier(master=self.master, input_connect=[input_connect[1]])
         self.r5 = Resonator(master=self.master, input_connect=[self.a5])
-        # 6th formant currently not part of run routine!
+        # 6th formant currently not part of run routine! Not sure what values
+        # to give to it... need to keep reading Klatt 1980. 
         self.a6 = Amplifier(master=self.master, input_connect=[input_connect[1]])
         self.r6 = Resonator(master=self.master, input_connect=[self.a6])
         self.output_mixer = Mixer(master=self.master,
@@ -391,6 +414,7 @@ class Klatt_Parallel(Klatt_Section):
                                                  self.r6])
         
     def run(self):
+        self.af.amplify(dB=self.master.af[self.master.current_inv])
         self.a1.amplify(dB=self.master.a1[self.master.current_inv])
         self.r1.resonate(ff=self.master.ff[0][self.master.current_inv],
                          bw=self.master.bw[0][self.master.current_inv])
