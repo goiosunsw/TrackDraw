@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import time
+import copy
 import sounddevice as sd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from scipy import signal
@@ -58,7 +59,22 @@ class Slots:
                     <b>TrackDraw v0.2.0</b>\n
                     Copyright (c) 2016
                     """
-        QMessageBox.about(parent, "About", aboutText)        
+        QMessageBox.about(parent, "About", aboutText)    
+        
+    @pyqtSlot()
+    def applyDefaults(self, *arg, **kwarg):
+        """
+        Restores all parameters to default values.
+        
+        TODO -- reflect it in the UI? 
+        """
+        TDD.CURRENT_PARAMS = copy.deepcopy(TDD.DEFAULT_PARAMS)
+        F0 = TDD.DEFAULT_PARAMS.F0
+        allFF = TDD.DEFAULT_PARAMS.FF
+        TDD.F0_TRACK =  [TDD.Track(F0*np.ones([TDD.DEFAULT_PARAMS.track_npoints]))]
+        TDD.TRACKS   = [TDD.Track(FF*np.ones([TDD.DEFAULT_PARAMS.track_npoints])) for FF in allFF]
+        self.master.cw.spec_cv.start(TDD.TRACKS)
+        self.master.cw.f0_cv.start(TDD.F0_TRACK)
     ##### End misc slots #####
     
     

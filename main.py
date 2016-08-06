@@ -28,6 +28,7 @@ class MainWindow(QMainWindow):
         audioSave = partial(slots.audioSave, parent=self)
         
         helpAbout = partial(slots.helpAbout, parent=self)
+        applyDefaults = partial(slots.applyDefaults)
         
         clearPlots = partial(slots.clearPlots)
         switchPlots = partial(slots.switchPlots)
@@ -78,7 +79,9 @@ class MainWindow(QMainWindow):
                 self.createMenuAction("S&ynthesize", synthesize,
                     "Ctrl+Y", None, "Synthesize using current settings"),
                 self.createMenuAction("Play", play, "Ctrl+P", None,
-                    "Play current displayed waveform")]
+                    "Play current displayed waveform"),
+                self.createMenuAction("Apply defaults", applyDefaults,
+                    "Ctrl+D", None, "Return all parameters to defaults")]
         self.ASMenu = self.menuBar().addMenu("A&nalysis/Synthesis")
         for action in ASMenuActions:
             self.ASMenu.addAction(action)
