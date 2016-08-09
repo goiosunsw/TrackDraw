@@ -64,7 +64,6 @@ class Track:
             final_value = self.points[-1]
             vector_to_be_appended = np.ones([track_npoints-len(self.points)])*final_value
             self.points = np.concatenate((self.points, vector_to_be_appended))
-#            self.points = np.concatenate(self.points, np.ones([track_npoints-len(self.points)])*final_value)
 
         
 class Parameters:

@@ -33,6 +33,11 @@ class CanvasGrid(QWidget):
         mainGrid.setColumnStretch(0, 1)
         mainGrid.setColumnStretch(1, 7)
 
+        self.paramComboBox = QComboBox()
+        self.paramComboBox.addItems(["F0", "Amplitude of voicing",
+                                     "Amplitude of QS voicing"])
+        self.paramComboBox.setCurrentIndex(0)
+        
         self.wave_cv = WaveCanvas(self)
         self.stft_cv = STFTCanvas(self)
         self.spec_cv = SpecCanvas(self)
@@ -41,6 +46,7 @@ class CanvasGrid(QWidget):
         mainGrid.addWidget(self.stft_cv, 1, 0)
         mainGrid.addWidget(self.spec_cv, 1, 1)
         mainGrid.addWidget(self.f0_cv, 2, 1)
+        mainGrid.addWidget(self.paramComboBox, 2, 0)
         
         self.current_waveform = None
         self.current_fs = None

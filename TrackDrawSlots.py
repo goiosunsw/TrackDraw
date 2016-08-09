@@ -65,6 +65,8 @@ class Slots:
     def applyDefaults(self, *arg, **kwarg):
         """
         Restores all parameters to default values.
+        
+        TODO -- need to find a better way to do this
         """
         # Reset params
         TDD.CURRENT_PARAMS = copy.deepcopy(TDD.DEFAULT_PARAMS)
