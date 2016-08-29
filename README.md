@@ -32,10 +32,18 @@ Features already implemented:
 - Track-style input for formant frequencies over time
 - Loading input speech waveform
 
-Features to be added in next update (version 0.1.1):
+Features to be added in next update (version 0.2.0, estimated release - 09/25/2016):
+- Variable thresholding on spectrogram
 - Saving synthesized speech waveform to wav file
 - Saving settings and synthesis parameters to disk
 - Klatt 1988 synthesizer
 
-Long term features to be added:
+Features to be added in next version change (version 1.0.0):
+- Automatic utterance copy (i.e. decomposing input waveform into synthesis parameters automatically)
+- Help menu and tooltips
+- GUI control of every parameter in Klatt synthesizer
+- Batch processing
+- Wavelet analysis
+
+Long term planned features:
 - Interfaces to allow access to TrackDraw functionality inside of the R and MATLAB programming environments
