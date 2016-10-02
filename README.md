@@ -32,11 +32,12 @@ Features already implemented:
 - Track-style input for formant frequencies over time
 - Loading input speech waveform
 
-Features to be added in next update (version 0.2.0, estimated release - 09/25/2016):
+Features to be added in next update (version 0.2.0, estimated release - winter 2016):
 - Variable thresholding on spectrogram
 - Saving synthesized speech waveform to wav file
 - Saving settings and synthesis parameters to disk
 - Klatt 1988 synthesizer
+- Cython implementation of recursive filters
 
 Features to be added in next version change (version 1.0.0):
 - Automatic utterance copy (i.e. decomposing input waveform into synthesis parameters automatically)
