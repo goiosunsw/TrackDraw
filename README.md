@@ -13,6 +13,25 @@ The original TrackDraw was a MATLAB package designed by Peter Assmann, Will Ball
 
 In the summer of 2016, efforts began to modernize the original TrackDraw and expand on its features. This code represents the first complete alpha build of the modernized TrackDraw in Python 3.
 
+Installation
+============
+
+To use TrackDraw, simply download this repository from Github using git ...
+
+```
+git clone https://github.com/guestdaniel/TrackDraw
+```
+
+or by downloading the zip directly from GitHub.
+
+Then, you just need to run main.py ...
+
+```
+python3 main.py
+```
+
+You will need NumPy, SciPy, Matplotlib, PyQt5, and sounddevice installed to use TrackDraw.
+
 Purpose
 =======
 TrackDraw is a speech analysis and synthesis tool, with a strong pedagogical focus. Features include:
