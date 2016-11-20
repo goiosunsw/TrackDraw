@@ -37,7 +37,7 @@ class CanvasGrid(QWidget):
         self.paramComboBox.addItems(["F0", "Amplitude of voicing",
                                      "Amplitude of QS voicing"])
         self.paramComboBox.setCurrentIndex(0)
-        
+
         self.wave_cv = WaveCanvas(self)
         self.stft_cv = STFTCanvas(self)
         self.spec_cv = SpecCanvas(self)
@@ -47,18 +47,18 @@ class CanvasGrid(QWidget):
         mainGrid.addWidget(self.spec_cv, 1, 1)
         mainGrid.addWidget(self.f0_cv, 2, 1)
         mainGrid.addWidget(self.paramComboBox, 2, 0)
-        
+
         self.current_waveform = None
         self.current_fs = None
-        
+
 class trackCanvas(FigureCanvas):
     """
     Canvas object for animated canvases in TrackDraw 2016.
-    
+
     Arguments:
         parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
             is a subclass of QWidget
-    
+
     Attributes:
         enabled (boolean) -- if True, tracks will be drawn. If not, they will
             still be properly stored, but will not be drawn.
@@ -71,20 +71,20 @@ class trackCanvas(FigureCanvas):
         y_high (float) -- upper limit of plot in y-dimension
         track_npoints (int) -- number of points in tracks
         locked_track (int) -- current locked track
-        
+
     trackCanvas is a subclass of FigureCanvas to be used for all TrackDraw
     animated plots which display tracks. This will allow for easy creation
     of other similar canvas objects to allow for animated graphical input of
     parameters. Currently, only F0Canvas and SpecCanvas use this as a parent
     class.
-    """    
+    """
     def __init__(self, parent=None):
         self.fig = Figure()
         self.ax = self.fig.add_subplot(111)
         self.ax.hold(False)
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
-        
+
         self.enabled = True
         self.background = None
         self.tracks = []
@@ -94,22 +94,22 @@ class trackCanvas(FigureCanvas):
         self.y_high = 0
         self.track_npoints = DEFAULT_PARAMS.track_npoints
         self.locked_track = 0
-        
+
     def clear(self):
         self.ax.clear()
         self.fig.canvas.draw()
-        
+
     def getBackground(self):
         """ Grabs current background. """
         self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-        
+
     def start(self, tracks):
-        """ 
-        Starts tracks. 
-        
+        """
+        Starts tracks.
+
         Arguments:
             tracks (list) -- list of TrackDrawData.Track objects.
-            
+
         Used whenever canvas is initialized, or when one needs a fresh empty background.
         """
         self.ax.clear()
@@ -124,7 +124,7 @@ class trackCanvas(FigureCanvas):
         self.ax.set_xlim(0, self.track_npoints - 1)
         self.ax.set_ylim(self.y_low, self.y_high)
         self.updateCanvas(redraw=True)
-        
+
     def mouse(self, event):
         """ Converts mouse coordinates in pixels to data coordinates. """
         x_loc, y_loc = self.ax.transData.inverted().transform((event.x, event.y))
@@ -133,21 +133,21 @@ class trackCanvas(FigureCanvas):
         # Only return if within plot limits
         if x_min < x_loc < x_max and y_min < y_loc < y_max:
             return(x_loc, y_loc)
-        
+
     def updateCanvas(self, new_tracks=0, trackNo=0, redraw=False):
         """
         Animates canvas.
-        
+
         Arguments:
             new_tracks (list) -- list of Track objects.
             trackNo (int) -- index of track which has been updated.
             redraw (boolean) -- if True, does not use new_track and trackNo
                 arguments to change a track.
-        
+
         First, the current background is restored. Then, if redraw is False,
-        the trackNo-th track's y_data is changed to match the data found in 
-        new_track. If self.enabled is True, the tracks are drawn. Finally, 
-        the axes' clipbox is blitted to animate changes. 
+        the trackNo-th track's y_data is changed to match the data found in
+        new_track. If self.enabled is True, the tracks are drawn. Finally,
+        the axes' clipbox is blitted to animate changes.
         """
         self.ax.set_xlim(0, self.track_npoints - 1)
         self.ax.set_ylim(self.y_low, self.y_high)
@@ -158,29 +158,29 @@ class trackCanvas(FigureCanvas):
             for i in range(len(self.tracks)):
                 self.ax.draw_artist(self.tracks[i][0])
         self.fig.canvas.blit(self.ax.clipbox)
-        
+
 
 class WaveCanvas(FigureCanvas):
     """
     Contains waveform reflecting current analyzed/plotted waveform.
-    
+
     Arguments:
         parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
             is a subclass of QWidget.
-        
-    Attributes: 
+
+    Attributes:
         enabled (boolean) -- if True, wave is plotted.
         current_waveform (np.array) -- stores most recently plotted waveform.
-        
+
     WaveCanvas stores the most recently plotted waveform and displays it if
     displayDock.waveCheckBox is checked. Whenever the current display option is
     changed (i.e. whenever displayDock's radio buttons to switch between synth
-    and loaded are pressed) the new waveform is plotted on wavecanvas using the 
+    and loaded are pressed) the new waveform is plotted on wavecanvas using the
     plot_waveform method even if the waveform is empty or not to be displayed.
     This way, if the user checks waveCheckBox it will display the correct
     waveform even if the waveCheckBox was unchecked when the display option was
     switched.
-    
+
     TODO -- replace with more generic subclass of figure canvas, like a generic
         subclass for non-animated plots? If it's worth it...
     """
@@ -190,17 +190,17 @@ class WaveCanvas(FigureCanvas):
         self.ax.hold(False)
         self.ax.xaxis.set_visible(False)
         self.ax.yaxis.set_visible(False)
-        self.fig.subplots_adjust(left=0.08, right=0.95) 
+        self.fig.subplots_adjust(left=0.08, right=0.95)
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
-        
+
         self.enabled = True
         self.current_waveform = None
-        
+
     def clear(self):
         self.ax.clear()
         self.fig.canvas.draw()
-        
+
     def plot_waveform(self, waveform):
         self.current_waveform = waveform
         try:
@@ -212,29 +212,29 @@ class WaveCanvas(FigureCanvas):
         except ValueError:
             return
 
-            
+
 class STFTCanvas(FigureCanvas):
     """
     Contains mag. spec. of small snippet of waveform around mouse cursor.
-    
+
     Arguments:
         parent (CanvasGrid object) -- refers to parent CanvasGrid object, which
             is a subclass of QWidget.
-    
+
     Attributes:
         background -- background stored from copy_from_bbox operation
         enabled (boolean) -- if True, STFT is plotted.
         stft (np.array) -- contains most recently plotted STFT
         stft_size (int) -- size of STFT frame in samples
-        
-    STFTCanvas is updated by the mouse() slot in Slots. A small chunk of the 
-    current displayed/analyzed waveform is grabbed, centered on the current 
-    x_loc of the mouse cursor and the magnitude spectrum of the chunk is 
+
+    STFTCanvas is updated by the mouse() slot in Slots. A small chunk of the
+    current displayed/analyzed waveform is grabbed, centered on the current
+    x_loc of the mouse cursor and the magnitude spectrum of the chunk is
     calculated and displayed (if the STFT checkbox is checked). Uses blitting
     to animate the plot efficiently.
-    
+
     TODO -- consider ways to use trackCanvas as parent class, might make things
-        easier and reduce code repetition? 
+        easier and reduce code repetition?
     """
     def __init__(self, parent=None):
         self.fig = Figure()
@@ -245,12 +245,12 @@ class STFTCanvas(FigureCanvas):
         self.fig.subplots_adjust(top=0.95, bottom=0.1)
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
-        
+
         self.background = None
         self.enabled = True
         self.stft = None
         self.stft_size = DEFAULT_PARAMS.stft_size
-        
+
     def start(self, restart=False):
         self.ax.clear()
         self.ax.set_xlim(-20, 40)
@@ -263,7 +263,7 @@ class STFTCanvas(FigureCanvas):
         self.ax.set_ylim(0, self.stft_size)
         if restart:
             self.update_stft(self.current_stft)
-        
+
     def update_stft(self, new_stft=0):
         try:
             self.stft.set_xdata(new_stft[0:-1])
@@ -275,14 +275,14 @@ class STFTCanvas(FigureCanvas):
         except RuntimeError:
             pass
 
-            
+
 class SpecCanvas(trackCanvas):
     """
     Contains tracks reflecting formant frequencies and plots spectrograms.
-    
+
     Arguments:
         See trackCanvas's doc string.
-        
+
     Attributes:
         See trackCanvas's doc string.
         current_waveform (np.array) -- waveform corresponding to the most
@@ -293,36 +293,36 @@ class SpecCanvas(trackCanvas):
             spectrogram is to be plotted.
         nformant (int) -- just keeps track of current number of formants to be
             reflected in tracks. May be best to replace its functionality, need
-            to change references to it in Slots. 
-            
+            to change references to it in Slots.
+
     SpecCanvas adds a number of attributes (and changes one default attribute)
     from its parent class, trackCanvas. It also adds a new method,
     plot_specgram(), which accepts data from TrackDraw about how to plot the
     spectrogram and then plots it and calls the right methods to make sure
-    tracks are also still plotted. 
-    
+    tracks are also still plotted.
+
     TODO -- figure out why it's only plotting the first track on startup
     """
     def __init__(self, parent=None):
         trackCanvas.__init__(self, parent=parent)
-        
+
         # Set SpecCanvas unique plot settings
         self.ax.set_xlabel("Time [s]")
         self.ax.set_ylabel("Frequency [Hz]")
         self.fig.subplots_adjust(left=0.08, top=0.95, right=0.95, bottom=0.1)
-        
+
         # Initialize SpecCanvas unique attributes, or adjust defaults
         self.current_waveform = None
         self.current_fs = None
         self.y_high = DEFAULT_PARAMS.synth_fs/2
         self.nformant = DEFAULT_PARAMS.nformant
-        
-    def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256, 
-                      noverlap=0.5, window_type=np.hanning, tracks=0, 
+
+    def plot_specgram(self, x_right=1.0, waveform=0, fs=0, window_len=256,
+                      noverlap=0.5, window_type=np.hanning, tracks=0,
                       restart=False):
         """
         Plots spectrogram on spec_cv
-        
+
         Arguments:
             x_right (float) -- right limit in x-dimension, usually set to
                 analyzed waveform's duration
@@ -338,14 +338,14 @@ class SpecCanvas(trackCanvas):
                 waveform/fs/duration/etc., if True, creates spectrogram based
                 on previously used waveform/fs/duration/etc. cached from last
                 call in current_waveform, current_fs
-        
+
         plot_specgram() handles the task of plotting a spectrogram to the
-        specCanvas based on input waveform/fs data or based on cached 
+        specCanvas based on input waveform/fs data or based on cached
         waveform/fs data from the most recent call to plot_specgram(). The axes
         are temporarily set to values appropriate for the spectrogram, then the
         new background (containing the plotted spectrogram) is grabbed and axes
         are restored to a scale appropriate for all Track related features.
-        
+
         TODO -- look into automatic zero-padding to fix scaling issues?
         TODO -- condense restart branches into one set of code
         TODO -- implement more clear system for setting limits and duration...
@@ -357,7 +357,7 @@ class SpecCanvas(trackCanvas):
             self.ax.clear()
             self.tracks = []
             self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
-                             noverlap=int(window_len*noverlap), window=window_type(window_len), 
+                             noverlap=int(window_len*noverlap), window=window_type(window_len),
                              cmap=plt.cm.gist_heat)
             self.fig.canvas.draw()
             self.getBackground()
@@ -367,43 +367,43 @@ class SpecCanvas(trackCanvas):
         elif restart == True:
             self.ax.clear()
             self.ax.specgram(self.current_waveform, NFFT=window_len, Fs=self.current_fs,\
-                             noverlap=int(window_len*noverlap), window=window_type(window_len), 
+                             noverlap=int(window_len*noverlap), window=window_type(window_len),
                              cmap=plt.cm.gist_heat)
             self.fig.canvas.draw()
             self.background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)
-            self.updateCanvas(redraw=True)            
-        
+            self.updateCanvas(redraw=True)
+
 
 class F0Canvas(trackCanvas):
     """
     Contains track representing an F0 contour.
-    
+
     Attributes:
         See trackCanvas' doc string.
         y_low (int) -- modified from trackCanvas, set to 90 as the lower margin
             for possible F0.
         y_high (int) -- modified from trackCavnas, set to 150 as the upper
-            margin for possible F0. 
-            
+            margin for possible F0.
+
     F0Canvas simply changes a handful fo default values from trackCanvas, and
-    otherwise functions as a typical trackCanvas. 
+    otherwise functions as a typical trackCanvas.
     """
     def __init__(self, parent=None):
         trackCanvas.__init__(self, parent=parent)
-        
+
         # Set F0Canvas unique plot settings
         self.ax.xaxis.set_visible(False)
-        self.fig.subplots_adjust(left=0.08, right=0.95) 
-        
+        self.fig.subplots_adjust(left=0.08, right=0.95)
+
         # Initialize F0Canvas unique attributes, or adjust defaults
         self.y_low = 90
         self.y_high = 150
-        
-        
+
+
 class DisplayDock(QDockWidget):
     """
     Contains interface/controls for all main window display parameters.
-    
+
     Arguments:
         parent (?) -- ?
 
@@ -417,14 +417,14 @@ class DisplayDock(QDockWidget):
         showFTCheckBox (QCheckBox) -- if checked, formant tracks are shown.
         clearButton (QButton) -- if pressed, all plots are cleared.
         trackGroup (SliderGroup2) -- group of sliders to control various track
-            parameters. 
+            parameters.
         trackBubbleCheckBox (QCheckBox) -- checkbox which allows track bubbles
             to be enabled or disabled.
-        
-            
+
+
     DisplayDock stores all user intefaces mechanisms that allow for changing
-    display-related parameters. Most widgets here which are attributes are 
-    attributes so they can be referred to/accessed in main or in 
+    display-related parameters. Most widgets here which are attributes are
+    attributes so they can be referred to/accessed in main or in
     TrackDrawSlots.
     """
     def __init__(self, parent=None):
@@ -454,7 +454,7 @@ class DisplayDock(QDockWidget):
         self.clearButton.setToolTip("Clear all plots")
         self.clearButton.setStatusTip("Clear all plots")
         ###
-        
+
         self.trackGroup = SliderGroup2(\
                 keys=["Number of points", "Bubble size"],
                 units=["", "Hz"],
@@ -462,7 +462,7 @@ class DisplayDock(QDockWidget):
                 maxs=[100, 500],
                 values=[DEFAULT_PARAMS.track_npoints,
                        DEFAULT_PARAMS.bubble_len])
-        
+
         self.trackBubbleCheckBox = QCheckBox("Use track bubbles")
         self.trackBubbleCheckBox.setChecked(False)
 
@@ -485,7 +485,7 @@ class DisplayDock(QDockWidget):
 class AnalysisDock(QDockWidget):
     """
     Contains interface/controls for all analysis parameters.
-    
+
     Arguments:
         parent (?) -- ?
 
@@ -501,7 +501,7 @@ class AnalysisDock(QDockWidget):
         waveletGroup (QGroupBox) -- groupbox containing the user interface for
             wavelet analysis parameters.
         applyButton (QButton) -- button which applies any updated analysis.
-            
+
     AnalysisDock stores all user intefaces mechanisms that allow for changing
     analysis-related parameters. Whenever the methodComboBox is changed, the
     dock displays the appropriate Group associated with the selected synthesis
@@ -545,7 +545,7 @@ class AnalysisDock(QDockWidget):
         self.windowComboBox.setCurrentIndex(0)
         windowVBox.addWidget(windowLabel)
         windowVBox.addWidget(self.windowComboBox)
-        
+
         self.spectrogramGroup = SliderGroup2(\
                 keys=["Frame size", "Frame overlap", "Threshold"],
                 units=["Samples", "%", "dB"],
@@ -606,7 +606,7 @@ class AnalysisDock(QDockWidget):
 class SynthesisDock(QDockWidget):
     """
     Contains interface/controls for all synthesis parameters.
-    
+
     Arguments:
         parent (?) -- ?
 
@@ -623,7 +623,7 @@ class SynthesisDock(QDockWidget):
             selection formant bandwidths to be synthesized.
         synthButton (QButton) -- button for initiating synthesis using current
             settings.
-            
+
     SynthesisDock stores all user intefaces mechanisms that allow for changing
     synthesis-related parameters. Whenever the methodComboBox is changed, the
     dock displays the appropriate Group associated with the selected synthesis
@@ -670,8 +670,8 @@ class SynthesisDock(QDockWidget):
 
         voicingGroup = QWidget()
         voicingVBox = QVBoxLayout()
-        voicingGroup.setLayout(voicingVBox)        
-        
+        voicingGroup.setLayout(voicingVBox)
+
         self.amplitudeGroup = SliderGroup2(\
                 keys=["Amplitude of voicing", "Amplitude of QS voicing",
                       "Amplitude of aspiration", "Amplitude of frication"],
@@ -789,9 +789,9 @@ class SliderGroup(QWidget):
                   + " " + self.unitsTxt
         self.topLabel.setText(newTopTxt)
 
-        
+
 class SliderGroup2(QWidget):
-    
+
     def __init__(self, keys, units, mins, maxs, values,
                  parent=None, slots=None):
         super(SliderGroup2, self).__init__(parent)
@@ -808,7 +808,7 @@ class SliderGroup2(QWidget):
         self.topLabel = {}
         self.minLabel = {}
         self.maxLabel = {}
-            
+
         for i in range(len(keys)):
             self.keys.append(keys[i])
             self.labelTxt[self.keys[i]] = self.keys[i] + ":"
@@ -832,7 +832,7 @@ class SliderGroup2(QWidget):
             SliderGrid.addWidget(self.minLabel[self.keys[i]], 2*i + 1, 0)
             SliderGrid.addWidget(self.sliders[self.keys[i]], 2*i + 1, 1)
             SliderGrid.addWidget(self.maxLabel[self.keys[i]], 2*i + 1, 2)
-            
+
     @pyqtSlot()
     def updateValueLabel(self, sliderKey=None):
         newTopTxt = self.labelTxt[sliderKey] + " " + str(self.sliders[sliderKey].value()) + " " + self.unitTxt[sliderKey]

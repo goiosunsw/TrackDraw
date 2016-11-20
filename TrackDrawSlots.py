@@ -17,10 +17,10 @@ from scipy.io import wavfile
 import synth
 
 class Slots:
-    
+
     def __init__(self, master):
         self.master = master
-    
+
     ##### File management slots ####
     @pyqtSlot()
     def audioOpen(self, *arg, parent=None, **kwarg):
@@ -32,7 +32,7 @@ class Slots:
             new_n  = round(new_fs/old_fs*len(x))
             new_x  = signal.resample(x, new_n)
             TDD.LOADED_SOUND.waveform = new_x
-            TDD.LOADED_SOUND.fs = new_fs   
+            TDD.LOADED_SOUND.fs = new_fs
         if self.master.displayDock.loadedRadioButton.isChecked():
             self.master.cw.spec_cv.plot_specgram(TDD.LOADED_SOUND.dur,
                                                  TDD.LOADED_SOUND.waveform,
@@ -42,7 +42,7 @@ class Slots:
                                                  TDD.CURRENT_PARAMS.window_type,
                                                  TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(TDD.LOADED_SOUND.waveform)
-    
+
     @pyqtSlot()
     def audioSave(self, *arg, parent=None, **kwarg):
         fname = QFileDialog.getSaveFileName(parent, "Save the synthesized sound",
@@ -50,8 +50,8 @@ class Slots:
         if fname[0]:
             print(fname)
     ##### End file management slots #####
-    
-    
+
+
     ##### Misc slots #####
     @pyqtSlot()
     def helpAbout(self, *arg, parent=None, **kwarg):
@@ -59,13 +59,13 @@ class Slots:
                     <b>TrackDraw v0.2.0</b>\n
                     Copyright (c) 2016
                     """
-        QMessageBox.about(parent, "About", aboutText)    
-        
+        QMessageBox.about(parent, "About", aboutText)
+
     @pyqtSlot()
     def applyDefaults(self, *arg, **kwarg):
         """
         Restores all parameters to default values.
-        
+
         TODO -- need to find a better way to do this
         """
         # Reset params
@@ -105,33 +105,33 @@ class Slots:
         self.master.synthesisDock.methodComboBox.setCurrentIndex(0)
         self.master.synthesisDock.nformantComboBox.setCurrentIndex(4)
     ##### End misc slots #####
-    
-    
+
+
     ##### Display slots #####
     @pyqtSlot()
     def clearPlots(self, *arg, **kwarg):
         """
         Clears plots.
-        
+
         TODO -- what is the point of this slot/button? If there is no replot
-            button, why is there a clear button? 
+            button, why is there a clear button?
         """
         self.master.cw.wave_cv.clear()
         self.master.cw.spec_cv.start(TDD.TRACKS)
-        
+
     @pyqtSlot()
     def enableTracks(self, *arg, **kwarg):
         if self.master.displayDock.showFTCheckBox.checkState() == 0:
             self.master.cw.spec_cv.enabled = False
         else:
             self.master.cw.spec_cv.enabled = True
-        self.master.cw.spec_cv.updateCanvas(redraw=1)        
-        
+        self.master.cw.spec_cv.updateCanvas(redraw=1)
+
     @pyqtSlot()
     def switchPlots(self, *arg, **kwarg):
         """
         Switches between displaying the loaded or synthed signal.
-        
+
         TODO -- seems a little slow... look into profiling it... probably is
             just the amount of plotting that needs to be done, and
             matplotlib is really slow by default. maybe we can convert wave
@@ -139,32 +139,32 @@ class Slots:
         """
         waveform, fs, dur = self.getCurrentWaveform()
         self.pushDisplayUpdates(waveform, fs, dur)
-            
+
     @pyqtSlot()
     def enableWave(self, *arg, **kwarg):
         """
         Enables or disables wave display when the wave checkbox is clicked.
-        
+
         Simply sets the canvas' visibility status on detection of any change
-        in the associated checkbox. 
-        
+        in the associated checkbox.
+
         TODO -- figure out how to properly resize window on change
-        TODO -- figure out how to best set some parameter in the canvas to 
+        TODO -- figure out how to best set some parameter in the canvas to
             disable unnecessary calculations
         """
         if self.master.displayDock.waveCheckBox.checkState() == 0:
             self.master.cw.wave_cv.setHidden(True)
         else:
             self.master.cw.wave_cv.setHidden(False)
-            
+
     @pyqtSlot()
     def enableSTFT(self, *arg, **kwarg):
         """
         Enables or disables STFT display when the STFT checkbox is clicked.
 
         TODO -- figure out how to properly resize window on change
-        TODO -- figure out how to best set some parameter in the canvas to 
-            disable unnecessary calculations        
+        TODO -- figure out how to best set some parameter in the canvas to
+            disable unnecessary calculations
         """
         if self.master.displayDock.STFTCheckBox.checkState() == 0:
             self.master.cw.stft_cv.setHidden(True)
@@ -172,16 +172,16 @@ class Slots:
         else:
             self.master.cw.stft_cv.setHidden(False)
             self.master.cw.stft_cv.enabled = True
-            
+
     @pyqtSlot()
     def changeNoTracks(self, curr_index, *arg, **kwarg):
         """
         Changes the number of tracks when nformant combobox is activated.
-        
+
         Arguments:
             curr_index (int) -- comes from combobox, indicates how many tracks
                 are to be used. Number of tracks is curr_index + 1.
-                
+
         changeNoTracks updates spec_cv's nformant and CURRENT_PARAMS's nformant
         and then properly removes or appends Track objects from/to TRACKS. Once
         the nformant variables and TRACKS are properly updated, the current
@@ -194,7 +194,7 @@ class Slots:
             difference = abs(self.master.cw.spec_cv.nformant - new_nformant)
             if difference == 1:
                 TDD.TRACKS.append(TDD.Track(np.ones([TDD.DEFAULT_PARAMS.track_npoints])*
-                                                    TDD.DEFAULT_PARAMS.FF[curr_index]))          
+                                                    TDD.DEFAULT_PARAMS.FF[curr_index]))
             elif difference > 1:
                 old_index = self.master.cw.spec_cv.nformant
                 for i in range(difference):
@@ -203,16 +203,16 @@ class Slots:
         # Need to update both spec_cv's nformant and current_param's nformant
         self.master.cw.spec_cv.nformant = new_nformant
         TDD.CURRENT_PARAMS.nformant = new_nformant
-        waveform, fs, dur = self.getCurrentWaveform()     
+        waveform, fs, dur = self.getCurrentWaveform()
         self.pushDisplayUpdates(waveform, fs, dur)
-        
+
     @pyqtSlot()
     def enableBubble(self, *arg, **kwarg):
         if self.master.displayDock.trackBubbleCheckBox.isChecked():
             TDD.CURRENT_PARAMS.track_bubble = True
         elif self.master.displayDock.trackBubbleCheckBox.isChecked():
             TDD.CURRENT_PARAMS.track_bubble = False
-        
+
     @pyqtSlot()
     def changeTracks(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.bubble_len = self.master.displayDock.trackGroup.sliders["Bubble size"].value()
@@ -224,14 +224,14 @@ class Slots:
             for i in range(len(TDD.TRACKS)):
                 TDD.TRACKS[i].changeNoPoints(new_track_npoints)
             TDD.F0_TRACK[0].changeNoPoints(new_track_npoints)
-            waveform, fs, dur = self.getCurrentWaveform()  
+            waveform, fs, dur = self.getCurrentWaveform()
             self.pushDisplayUpdates(waveform, fs, dur)
-        
+
     @pyqtSlot()
     def onResize(self, *arg, **kwarg):
         """
         Called whenever a resize of the main window occurs, restarts all plots.
-        
+
         On any resize of the main window, the current displayed waveform is
         grabbed and sent to the pushDisplayUpdates function, which restarts
         all animated plots so that their backgrounds are appropriately updated.
@@ -239,8 +239,8 @@ class Slots:
         waveform, fs, dur = self.getCurrentWaveform()
         self.pushDisplayUpdates(waveform, fs, dur)
     ##### End display slots #####
-    
-    
+
+
     ##### Analysis slots #####
     @pyqtSlot()
     def applyAnalysis(self, *arg, **kwarg):
@@ -250,23 +250,23 @@ class Slots:
         self.master.cw.spec_cv.plot_specgram(window_len=TDD.CURRENT_PARAMS.window_len,
                                              window_type=TDD.CURRENT_PARAMS.window_type,
                                              noverlap=TDD.CURRENT_PARAMS.noverlap,
-                                             tracks=TDD.TRACKS, restart=True)   
+                                             tracks=TDD.TRACKS, restart=True)
         self.master.cw.stft_cv.start()
-       
+
     @pyqtSlot()
     def changeWindow(self, curr_index, *arg, **kwarg):
         """
         Changes the window type to be used by the spectrogram.
-        
+
         Arguments:
             curr_index (int) -- comes from the combobox, indicates which window
-                is to be used. 
-        
+                is to be used.
+
         Whenever the window type combobox is used, the window_type attribute of
         CURRENT_PARAMS is updated accordingly.
-        
+
         TODO -- is there a better way to do this? Maybe we could use the text
-            of the current index so that at least we can be sure we're 
+            of the current index so that at least we can be sure we're
             setting the right window? Or actually store the windows as data
             in the combobox?
         """
@@ -276,14 +276,14 @@ class Slots:
             TDD.CURRENT_PARAMS.window_type = np.bartlett
         if curr_index == 2:
             TDD.CURRENT_PARAMS.window_type = np.blackman
-                
+
     @pyqtSlot()
     def changeSpectrogram(self, *arg, **kwarg):
         TDD.CURRENT_PARAMS.window_len =\
             self.master.analysisDock.spectrogramGroup.sliders["Frame size"].value()
         TDD.CURRENT_PARAMS.noverlap =\
             self.master.analysisDock.spectrogramGroup.sliders["Frame overlap"].value()/100
-        
+
     @pyqtSlot()
     def changeSTFTSize(self, *arg, **kwarg):
         """ Change size of frame for STFT display. """
@@ -294,23 +294,23 @@ class Slots:
                 self.master.analysisDock.stftSizeGroup.currValue
         self.master.cw.stft_cv.start(restart=True)
     ##### End analysis slots #####
-    
-    
+
+
     ##### Synthesis slots #####
     @pyqtSlot()
     def changeSynth(self, curr_index, *arg, **kwarg):
         """
-        Change which synth is to be used by synthesize(). 
-        
+        Change which synth is to be used by synthesize().
+
         Arguments:
             curr_index (int) -- comes from the combobox, indicates which synth
                 is to be used.
-                
+
         Whenever the synth type combobox is used, the synth_type attribute of
         CURRENT_PARAMS is updated accordingly.
-        
+
         TODO -- is there a better way to do this? Maybe we could use the text
-            of the current index so that at least we can be sure we're 
+            of the current index so that at least we can be sure we're
             setting the right synth? Or actually store the synths as data
             in the combobox?
         """
@@ -318,20 +318,20 @@ class Slots:
             TDD.CURRENT_PARAMS.synth_type = "Klatt 1980"
         if curr_index == 1:
             TDD.CURRENT_PARAMS.synth_type = "Sine wave"
-            
+
     @pyqtSlot()
     def changeBW(self, *arg, **kwarg):
         """
         Updates formant bandwidth values when sliders are used.
-        
-        TODO -- figure out where to store slider keys? 
+
+        TODO -- figure out where to store slider keys?
         """
         keys = ["F1 bandwidth", "F2 bandwidth", "F3 bandwidth", "F4 bandwidth",
                 "F5 bandwidth"]
         for i in range(5):
             TDD.CURRENT_PARAMS.BW[i] =\
                  self.master.synthesisDock.FFBandwidthGroup.sliders[keys[i]].value()
- 
+
     @pyqtSlot()
     def changeAmplitude(self, *arg, **kwarg):
         keys = ["Amplitude of voicing", "Amplitude of QS voicing",
@@ -344,15 +344,15 @@ class Slots:
             self.master.synthesisDock.amplitudeGroup.sliders[keys[2]].value()
         TDD.CURRENT_PARAMS.AF =\
             self.master.synthesisDock.amplitudeGroup.sliders[keys[3]].value()
-        
+
     @pyqtSlot()
     def synthesize(self, *arg, **kwarg):
         """
         Synthesizes waveform with current syntheis parameters.
-        
+
         Synthesize updates CURRENT_PARAMS's F0 and FF information by extracting
         it from F0_TRACK and TRACKS, then synthesizes a waveform based on the
-        current synthesis parameters and updates SYNTH_SOUND.waveform 
+        current synthesis parameters and updates SYNTH_SOUND.waveform
         accordingly. Then, if the synth radio button is checked, the changes
         to the waveform are reflected in the display.
         """
@@ -365,7 +365,7 @@ class Slots:
             TDD.CURRENT_PARAMS.dur = 1
         else:
             TDD.CURRENT_PARAMS.dur = TDD.LOADED_SOUND.dur
-        
+
         if TDD.CURRENT_PARAMS.synth_type == "Klatt 1980":
             TDD.SYNTH_SOUND.waveform = synth.klatt.klatt_make(TDD.CURRENT_PARAMS)
         elif TDD.CURRENT_PARAMS.synth_type == "Sine wave":
@@ -379,15 +379,15 @@ class Slots:
                                                  window_type=TDD.CURRENT_PARAMS.window_type,
                                                  tracks=TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(TDD.SYNTH_SOUND.waveform)
-    ##### End synthesis slots #####    
-    
-    
+    ##### End synthesis slots #####
+
+
     ##### Track slots #####
     @pyqtSlot()
     def mouse(self, *arg, **kwarg):
         """
         Performs TRACKS, F0_TRACK, or stft updates depending on canvas activity
-        
+
         Arguments:
             event (PyQt Event) -- passed as default index 0 argument in *arg.
             plots (TrackDraw Canvas object) -- passed as "plot" in **kwarg,
@@ -395,37 +395,37 @@ class Slots:
             target (string) -- passed as "target" in **kwarg, used to provide
                 conditional functionality in mouse() based on whether one is
                 manipulating the f0_cv or the spec_cv.
-            wasClick (boolean) -- passed as "wasClick" in **kwarg, used to 
+            wasClick (boolean) -- passed as "wasClick" in **kwarg, used to
                 provide different functionality based on whether current mouse
                 action was a single click or a mouse drag movement.
-            
+
         Whenever spec_cv or f0_cv record mouse activity, this slot handles that
         activity. If the mouse button is clicked on the spec_cv, the nearest
         vertex to the mouse is found and updated to the mouse's location in the
-        y-dimension, and the index of the track to which the updated vertex 
+        y-dimension, and the index of the track to which the updated vertex
         belongs is set as locked_track. If the mouse button is clicked on
         f0_cv, just the vertex update occurs. If the mouse is dragged on
         spec_cv, the same updating that occurs with a click occurs, except
         the track updated is always the locked_track from the most recent click.
-        If the mouse is dragged on the f0_cv, the same thing happens as with a 
+        If the mouse is dragged on the f0_cv, the same thing happens as with a
         click. Regardless of if the mouse button is down or not, the stft_cv is
-        updated with an stft around the mouse's current location if possible. 
-        
+        updated with an stft around the mouse's current location if possible.
+
         The general pattern for track updates is that an x_loc and y_loc are
         received from the canvas if the mouse is within the bounds of the
         plotted area. The x_loc and y_loc received are in coordinates in terms
         of the tracks. Then, the nearest vertex is found, the track(s) data in
         TDD is updated, and the updated track data is sent back to the relevant
-        canvas using the canvas' updateCanvas() method. 
-        
+        canvas using the canvas' updateCanvas() method.
+
         The general pattern for stft updates is that an x_loc and y_loc are
         received from the canvas if the mouse is within the bounds of the
         plotted area. The x_loc and y_loc received are in coordinates in terms
-        of the tracks, so x_loc is converted to be in terms of the samples of 
+        of the tracks, so x_loc is converted to be in terms of the samples of
         the displayed signal. Then, if an stft around that location is possible
         (i.e. if an stft has room to be calculated) it is calculated, converted
         to log scale, and passed to stft_cv via stft_cv's update_stft method.
-        
+
         TODO -- add alternative functionality when SHIFT or CTRL keys are
             applied. See main.py for some helpful code to make those as well as
             the deprecated mouse_shift() slot below.
@@ -466,7 +466,7 @@ class Slots:
             if TDD.CURRENT_PARAMS.track_bubble == True and len(tracks) > 1:
                 if y_coords_at_nearest_x[plot.locked_track] < y_loc:
                     try:
-                        val_above = y_coords_at_nearest_x[plot.locked_track + 1] 
+                        val_above = y_coords_at_nearest_x[plot.locked_track + 1]
                         difference = abs(val_above - y_loc)
                         if difference <= TDD.CURRENT_PARAMS.bubble_len:
                             tracks[plot.locked_track].points[nearest_x_idx] =\
@@ -503,7 +503,7 @@ class Slots:
                     self.master.cw.stft_cv.update_stft(magnitude)
             except TypeError:
                 pass
-        
+
     @pyqtSlot()
     def mouse_ctrl(self, *arg, **kwarg):
         """
@@ -577,8 +577,8 @@ class Slots:
         except TypeError:
             pass
     ##### End track slots #####
-    
-    
+
+
     ##### Playback slots #####
     @pyqtSlot()
     def play(self):
@@ -588,21 +588,21 @@ class Slots:
         sd.play(waveform, fs)
         time.sleep(dur)
     ##### End playback slots #####
-    
-    
+
+
     ##### Non-slots #####
     def getCurrentWaveform(self):
         """
         Grabs currently displayed waveform data.
-        
-        Checks which display radio button (synth or loaded) is currently 
+
+        Checks which display radio button (synth or loaded) is currently
         checked. Then grabs the correct waveform, fs, and dur associated with
-        the current displayed signal. 
-        
+        the current displayed signal.
+
         TODO -- replace with a better system. Right now, anytime changes occur
             to display/plotting parameters, the slot which handles that update
             calls this method to get the current waveform. In the long run,
-            there needs to be some better way of doing this. 
+            there needs to be some better way of doing this.
         """
         if self.master.displayDock.synthedRadioButton.isChecked():
             waveform = TDD.SYNTH_SOUND.waveform
@@ -613,21 +613,21 @@ class Slots:
             fs = TDD.LOADED_SOUND.fs
             dur = TDD.LOADED_SOUND.dur
         return(waveform, fs, dur)
-        
+
     def pushDisplayUpdates(self, waveform, fs, dur):
         """
         Updates all canvases to reflect any parameter changes.
-        
+
         Arguments:
             waveform (np.array) -- current displayed waveform, usually grabbed
                 by getCurrentWaveform() function.
-            fs (int) -- sampling rate in Hz of current displayed waveform, 
+            fs (int) -- sampling rate in Hz of current displayed waveform,
                 usually grabbed by getCurrentwavform() function.
-            dur (float) -- duration in seconds of current displayed waveform, 
-                usually grabbed in getCurrentWaveform() function. 
-        
+            dur (float) -- duration in seconds of current displayed waveform,
+                usually grabbed in getCurrentWaveform() function.
+
         This is a utility function called by various slots whenever they change
-        elements pertaining to the canvases/display. It updates the display 
+        elements pertaining to the canvases/display. It updates the display
         in an appropriate way by calling the canvases' start() methods if the
         length of the waveform is 1 (i.e. the waveform is empty) or by calling
         the canvases' plot_***() methods if the waveform contains a sound.
@@ -644,5 +644,5 @@ class Slots:
                     TDD.CURRENT_PARAMS.window_type, TDD.TRACKS)
             self.master.cw.wave_cv.plot_waveform(waveform)
             self.master.cw.f0_cv.start(TDD.F0_TRACK)
-        
-    ##### End non-slots #####  
+
+    ##### End non-slots #####

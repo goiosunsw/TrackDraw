@@ -26,10 +26,10 @@ class MainWindow(QMainWindow):
         # Callbacks created using functools.partial
         audioOpen = partial(slots.audioOpen, parent=self)
         audioSave = partial(slots.audioSave, parent=self)
-        
+
         helpAbout = partial(slots.helpAbout, parent=self)
         applyDefaults = partial(slots.applyDefaults)
-        
+
         clearPlots = partial(slots.clearPlots)
         switchPlots = partial(slots.switchPlots)
         enableWave = partial(slots.enableWave)
@@ -39,24 +39,24 @@ class MainWindow(QMainWindow):
         self.onResize = partial(slots.onResize)
         changeTracks = partial(slots.changeTracks)
         enableBubble = partial(slots.enableBubble)
-        
+
         applyAnalysis = partial(slots.applyAnalysis)
         changeWindow = partial(slots.changeWindow)
         changeSpectrogram = partial(slots.changeSpectrogram)
         changeSTFTSize = partial(slots.changeSTFTSize)
-        
+
         synthesize = partial(slots.synthesize)
         changeBW = partial(slots.changeBW)
         changeSynth = partial(slots.changeSynth)
         changeAmplitude = partial(slots.changeAmplitude)
-        
+
         play = partial(slots.play)
         ##### End callbacks setup #####
-        
+
         ##### Menus #####
         # File menu
         fileMenuActions = [\
-                self.createMenuAction("&Open a sound file...", 
+                self.createMenuAction("&Open a sound file...",
                     audioOpen, QKeySequence.Open, None,
                     "Open a sound file"),
                 self.createMenuAction("&Save synthesis...", audioSave,
@@ -122,13 +122,13 @@ class MainWindow(QMainWindow):
         status.addPermanentWidget(self.sizeLabel)
         status.showMessage("Welcome to TrackDraw!", 5000)
         ##### End status bar setup #####
-        
+
         ##### Combo boxes #####
         self.analysisDock.windowComboBox.activated.connect(changeWindow)
         self.synthesisDock.methodComboBox.activated.connect(changeSynth)
         self.synthesisDock.nformantComboBox.activated.connect(changeNoTracks)
         #### End Combo Boxes Setup #####
-        
+
         ##### Sliders #####
         keys = ["Frame size", "Frame overlap", "Threshold"]
         for i in range(3):
@@ -145,7 +145,7 @@ class MainWindow(QMainWindow):
         for i in range(4):
             self.synthesisDock.amplitudeGroup.sliders[keys[i]].valueChanged.connect(changeAmplitude)
         ##### End sliders setup #####
-        
+
         ##### Buttons #####
         self.synthesisDock.synthButton.clicked.connect(synthesize)
         self.displayDock.clearButton.clicked.connect(clearPlots)
@@ -156,21 +156,19 @@ class MainWindow(QMainWindow):
         self.displayDock.STFTCheckBox.stateChanged.connect(enableSTFT)
         self.displayDock.trackBubbleCheckBox.stateChanged.connect(enableBubble)
         ##### End buttons setup #####
-        
+
         ##### Canvases #####
         click_f0 = partial(slots.mouse, wasClick=True, plot=self.cw.f0_cv, target="F0")
         drag_f0 = partial(slots.mouse, wasClick=False, plot=self.cw.f0_cv, target="F0")
-#        modifiers = QApplication.keyboardModifiers()
-#        if modifiers == Qt.ShiftModifier:
         self.cw.f0_cv.fig.canvas.mpl_connect('button_press_event', click_f0)
         self.cw.f0_cv.fig.canvas.mpl_connect('motion_notify_event', drag_f0)
-        
+
         click_ff = partial(slots.mouse, wasClick=True, plot=self.cw.spec_cv, target="FF")
         drag_ff = partial(slots.mouse, wasClick=False, plot=self.cw.spec_cv, target="FF")
         self.cw.spec_cv.fig.canvas.mpl_connect('button_press_event', click_ff)
         self.cw.spec_cv.fig.canvas.mpl_connect('motion_notify_event', drag_ff)
         ##### End canvases setup #####
-    
+
     def createMenuAction(self, text, slot=None, shortcut=None, icon=None,
             tip=None, checkable=False, signal="triggered()"):
         action = QAction(text, self)
@@ -186,7 +184,7 @@ class MainWindow(QMainWindow):
         if checkable:
             action.setCheckable(True)
         return action
-        
+
     def resizeEvent(self, event):
         self.onResize()
 
