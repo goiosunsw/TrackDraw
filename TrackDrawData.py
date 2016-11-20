@@ -13,7 +13,7 @@ import matplotlib.mlab as mlab
 class Sound:
     """
     Any loaded or synthesized sound.
-    
+
     Arguments:
         fs (int) -- sample rate in Hz.
         waveform (np.array) -- signal of the sound.
@@ -25,8 +25,8 @@ class Sound:
         nchannels -- see above
         nsamples (int) -- number of samples in signal.
         dur (float) -- length of signal in seconds.
-        
-    Used to store all the necessary elements to analyze or play back a sound. 
+
+    Used to store all the necessary elements to analyze or play back a sound.
     Only the sound's waveform and fs need to be provided, everything else
     is derived or has default values.
     """
@@ -49,12 +49,12 @@ class Sound:
 class Track:
     """
     Class for organizing sequences of y coordinates.
-    
+
     TODO -- flesh out this doc string.
     """
     def __init__(self, points):
         self.points = points
-        
+
     def changeNoPoints(self, track_npoints):
         if len(self.points) == track_npoints:
             return
@@ -65,11 +65,11 @@ class Track:
             vector_to_be_appended = np.ones([track_npoints-len(self.points)])*final_value
             self.points = np.concatenate((self.points, vector_to_be_appended))
 
-        
+
 class Parameters:
     """
     Contains parameters for TrackDraw 2016.
-    
+
     TODO -- flesh out this doc string.
     """
     def __init__(self, F0=100,
@@ -118,8 +118,8 @@ class Parameters:
         self.track_bubble = track_bubble
         self.bubble_len = bubble_len
         self.threshold = threshold
-        
-        
+
+
 DEFAULT_PARAMS = Parameters()
 CURRENT_PARAMS = Parameters()
 LOADED_SOUND = Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
