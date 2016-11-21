@@ -10,11 +10,31 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import time
 import copy
-import sounddevice as sd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from scipy import signal
 from scipy.io import wavfile
 import synth
+
+# Check operating system, import playback library accordingly
+import platform
+if platform.system() == "Windows":
+    print("System recognized as Windows. Using sounddevice as playback library.")
+    try:
+        import sounddevice as sd
+    except ImportError:
+        print("sounddevice not installed. Please install sounddevice and try again.")
+        sys.exit()
+elif platform.system() == "Mac":
+    print("Sorry, Mac is not supported at this time.")
+    sys.exit()
+elif platform.system() == "Linux":
+    print("System recognized as Linux. Using sounddevice as playback library.")
+    try:
+        import sounddevice as sd
+    except ImportError:
+        print("sounddevice not installed. Please install sounddevice and try again.")
+        sys.exit()
+
 
 class Slots:
 
