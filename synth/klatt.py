@@ -81,6 +81,7 @@ class TVParameters:
                        FNP=250,
                        BNP=100,
                        BNZ=100,
+                       BGS=200,
                        track_npoints=80):
         self.F0 = F0
         self.FF = [Track(np.ones(track_npoints)*FF[i]) for i in range(N_FORM)]
@@ -98,6 +99,7 @@ class TVParameters:
         self.FNP = FNP
         self.BNP = BNP
         self.BNZ = BNZ
+        self.BGS = BGS
 
 
 class Track:
@@ -140,7 +142,7 @@ def klatt_make(tvparams, ntvparams):
         ntvparams --- non-time-varying parameters object
     """
     # Initialize synth
-    synth = KlattSynth(ntvparams.N_SAMP)
+    synth = KlattSynth()
 
     # Loop through all time-varying parameters, processing as needed
     for param in list(filter(lambda aname: not aname.startswith("_"),
@@ -156,10 +158,8 @@ def klatt_make(tvparams, ntvparams):
     # Loop through all non-time-varying parameters and load
     for param in list(filter(lambda aname: not aname.startswith("_"),
                              dir(ntvparams))):
-        if param is "N_SAMP":
-            continue
-        else:
-            synth.params[param] = getattr(ntvparams,param)
+        synth.params[param] = getattr(ntvparams,param)
+    synth.setup()
     return(synth)
 
 def klatt_trackterpolate(track, n_samp):
@@ -201,7 +201,13 @@ class KlattSynth(object):
 
     KlattSynth is not designed for real-time operation in any way.
     """
-    def __init__(self, N_SAMP):
+    def __init__(self):
+        """
+        Initializes KlattSynth object.
+
+        Creates name and tag which can be used by TrackDraw to display current
+        synthesis type. Also creates the parameter list, but leaves it blank.
+        """
         # Create tags
         self.name = "Klatt 1988 Synthesizer"
         self.algorithm = "KLSYN88+"
@@ -210,7 +216,7 @@ class KlattSynth(object):
         param_list = ["F0", "AV", "OQ", "SQ", "TL", "FL", # Source
                       "DI", "AVS", "AV", "AF", "AH",      # Source
                       "FF", "BW",                         # Formants
-                      "FGP", "BGP", "FGZ", "BGZ",         # Glottal pole/zero
+                      "FGP", "BGP", "FGZ", "BGZ", "BGS",  # Glottal pole/zero
                       "FNP", "BNP", "FNZ", "BNZ",         # Nasal pole/zero
                       "FTP", "BTP", "FTZ", "BTZ",         # Tracheal pole/zero
                       "A2F", "A3F", "A4F", "A5F", "A6F",  # Frication parallel
@@ -220,10 +226,19 @@ class KlattSynth(object):
                       "SW", "INV_SAMP", "N_INV", "N_FORM",# Synth settings
                       "N_SAMP", "FS", "DT"]               # Synth settings
         self.params = {param: None for param in param_list}
-        self.params["N_SAMP"] = N_SAMP
 
+    def setup(self):
+        """
+        Sets up Klatt synthesizer.
+
+        Run after parameter values are set, creates output vector, derives
+        necessary variables from input parameters, initializes sections.
+        """
         # Initialize data vectors
         self.output = np.zeros(self.params["N_SAMP"])
+
+        # Derive dt
+        self.params["DT"] = 1/self.params["FS"]
 
         # Initialize sections
         self.voice = KlattVoice1980(self)
@@ -258,10 +273,31 @@ class KlattVoice1980(KlattSection):
     def __init__(self, master):
         KlattSection.__init__(self, master)
         self.impulse = Impulse(master=self.master)
+        self.rgp = Resonator(master=self.master,
+                             input_connect=[self.impulse])
+        self.rgz = Resonator(master=self.master,
+                             input_connect=[self.rgp], anti=True)
+        self.rgs = Resonator(master=self.master,
+                             input_connect=[self.rgp])
+        self.av = Amplifier(master=self.master,
+                            input_connect=[self.rgz])
+        self.avs = Amplifier(master=self.master,
+                             input_connect=[self.rgs])
+        self.mixer = Mixer(master=self.master,
+                           input_connect=[self.av, self.avs])
 
     def run(self):
         self.impulse.impulse_gen()
-        self.output[:] = self.impulse.output[:]
+        self.rgp.resonate(ff=self.master.params["FGP"],
+                          bw=self.master.params["BGP"])
+        self.rgz.resonate(ff=self.master.params["FGZ"],
+                          bw=self.master.params["BGZ"])
+        self.rgs.resonate(ff=self.master.params["FGP"],
+                          bw=self.master.params["BGS"])
+        self.av.amplify(dB=self.master.params["AV"])
+        self.avs.amplify(dB=self.master.params["AVS"])
+        self.mixer.mix()
+        self.output[:] = self.mixer.output[:]
 
 
 class KlattComponent:
@@ -281,15 +317,46 @@ class KlattComponent:
         self.input[:] = self.input_connect[0].output[:]
 
 
+class Resonator(KlattComponent):
+    """
+    Klatt resonator.
+    """
+    def __init__(self, master, input_connect=None, anti=False):
+        KlattComponent.__init__(self, master, input_connect)
+        self.anti = anti
+
+    def calc_coef(self, ff, bw):
+        c = -np.exp(-2*np.pi*bw*self.master.params["DT"])
+        b = (2*np.exp(-np.pi*bw*self.master.params["DT"])\
+             *np.cos(2*np.pi*ff*self.master.params["DT"]))
+        a = 1-b-c
+        if self.anti:
+            a_prime = 1/a
+            b_prime = -b/a
+            c_prime = -c/a
+            return(a_prime, b_prime, c_prime)
+        else:
+            return(a, b, c)
+
+    def resonate(self, ff, bw):
+        self.pull()
+        a, b, c = self.calc_coef(ff, bw)
+        self.output[0] = a[0]*self.input[0]
+        if self.anti:
+            self.output[1] = a[1]*self.input[1] + b[1]*self.input[0]
+            for n in range(2, self.master.params["N_SAMP"]):
+                self.output[n] = a[n]*self.input[n] + b[n]*self.input[n-1] \
+                                + c[n]*self.input[n-2]
+        else:
+            self.output[1] = a[1]*self.input[1] + b[1]*self.output[0]
+            for n in range(2,self.master.params["N_SAMP"]):
+                self.output[n] = a[n]*self.input[n] + b[n]*self.output[n-1] \
+                                + c[n]*self.output[n-2]
+
+
 class Impulse(KlattComponent):
     """
-    Klatt time-varying impulse generator.
-
-    Calculates the length of a glottal pulse period in samples based on the
-    current interval's sampling rate and F0 value, stores this value in
-    glot_period. Then goes through each sample of the current interval to
-    determine if glot_period samples have passed since the last glottal pulse,
-    whose index is stored in Klatt_Synth as an attribute called last_glot_pulse.
+    Time-varying impulse generator.
     """
     def __init__(self, master):
         KlattComponent.__init__(self, master)
@@ -303,3 +370,56 @@ class Impulse(KlattComponent):
             if n - self.last_glot_pulse >= glot_period[n]:
                 self.output[n] = 1
                 self.last_glot_pulse = n
+
+
+class Amplifier(KlattComponent):
+    """
+    Simple amplifier, scales amplitude of signal by dB value.
+    """
+    def __init__(self, master, input_connect):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def amplify(self, dB):
+        self.pull()
+        dB = np.sqrt(10)**(dB/10)
+        self.output[:] = self.input[:]*dB
+
+
+class Mixer(KlattComponent):
+    """
+    Simple mixer. Supports an arbitrary number of channels.
+    """
+    def __init__(self, master, input_connect):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def mix(self):
+        for i in range(len(self.input_connect)):
+            self.output[:] = self.output[:] + self.input_connect[i].output[:]
+
+
+class Firstdiff(KlattComponent):
+    """
+    Simple first difference operator.
+    """
+    def __init__(self, master, input_connect):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def differentiate(self):
+        self.pull()
+        self.output[0] = self.input[0]
+        for n in range(1, self.master.params["N_SAMP"]):
+            self.output[n] = self.input[n] - self.input[n-1]
+
+
+class Lowpass(KlattComponent):
+    """
+    Simple one-zero 6 dB/oct lowpass filter.
+    """
+    def __init__(self, master, input_connect):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def filter(self):
+        self.pull()
+        self.output[0] = self.input[0]
+        for n in range(1, self.master.params["N_SAMP"]):
+            self.output[n] = self.input[n] + self.output[n-1]
