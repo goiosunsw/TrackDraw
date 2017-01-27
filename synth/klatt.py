@@ -242,19 +242,19 @@ class KlattSynth(object):
 
         # Initialize sections
         self.voice = KlattVoice1980(self)
-        # self.noise = KlattNoise(self)
-        # self.cascade = KlattCascade(self, [self.voice, self.noise])
+        self.noise = KlattNoise1980(self)
+        self.cascade = KlattCascade(self, [self.voice, self.noise])
         # self.parallel = KlattParallel(self, [self.voice, self.noise])
-        # self.radiation = KlattRadiation(self, [self.cascade, self.parallel])
-        # self.output_module = KlattOutput(self, [self.radiation])
+        self.radiation = KlattRadiation(self, [self.cascade])
+        self.output_module = KlattOutput(self, [self.radiation])
 
     def run(self):
         self.voice.run()
             #self.noise.run()
-            #self.cascade.run()
-            #self.radiation.run()
-            #self.output_module.run()
-        self.output[:] = self.voice.output[:]
+        self.cascade.run()
+        self.radiation.run()
+        self.output_module.run()
+        self.output[:] = self.output_module.output[:]
 
 
 class KlattSection:
@@ -298,6 +298,86 @@ class KlattVoice1980(KlattSection):
         self.avs.amplify(dB=self.master.params["AVS"])
         self.mixer.mix()
         self.output[:] = self.mixer.output[:]
+
+
+class KlattNoise1980(KlattSection):
+    """
+    Generates noise ala Klatt 1980.
+    """
+    def __init__(self, master):
+        KlattSection.__init__(self, master)
+        self.noisegen = Noisegen(master=self.master)
+        self.lowpass = Lowpass(master=self.master,
+                               input_connect=[self.noisegen])
+        self.amp = Amplifier(master=self.master,
+                             input_connect=[self.lowpass])
+
+    def run(self):
+        self.noisegen.generate()
+        self.lowpass.filter()
+        self.amp.amplify(dB=-100)
+        self.output[:] = self.amp.output[:]
+
+class KlattCascade(KlattSection):
+    """
+    Simulates a vocal tract with a cascade of resonators.
+    """
+    def __init__(self, master, input_connect):
+        KlattSection.__init__(self, master)
+        self.ah = Amplifier(master=self.master,
+                            input_connect=[input_connect[1]])
+        self.mixer = Mixer(master=self.master,
+                           input_connect=[input_connect[0], self.ah])
+        self.rnp = Resonator(master=self.master,
+                             input_connect=[self.mixer])
+        self.rnz = Resonator(master=self.master,
+                             input_connect=[self.rnp], anti=True)
+        self.formants = []
+        self.formants.append(Resonator(master=self.master, input_connect=[self.rnz]))
+        previous_formant = self.formants[0]
+        for form in range(1, self.master.params["N_FORM"]):
+            self.formants.append(Resonator(master=self.master, input_connect=[previous_formant]))
+            previous_formant = self.formants[form]
+
+    def run(self):
+        self.ah.amplify(dB=self.master.params["AH"])
+        self.mixer.mix()
+        self.rnp.resonate(ff=self.master.params["FNP"],
+                          bw=self.master.params["BNP"])
+        self.rnz.resonate(ff=self.master.params["FNZ"],
+                          bw=self.master.params["BNZ"])
+        for form in range(len(self.formants)):
+            self.formants[form].resonate(ff=self.master.params["FF"][form],
+                                         bw=self.master.params["BW"][form])
+        self.output[:] = self.formants[-1].output[:]
+
+
+class KlattRadiation(KlattSection):
+    """
+    Simulates the effect of radiation characteristic in the vocal tract.
+    """
+    def __init__(self, master, input_connect):
+        KlattSection.__init__(self, master)
+        self.mixer = Mixer(master=self.master,
+                           input_connect=input_connect)
+        self.radiation = Firstdiff(master=self.master,
+                                   input_connect=[self.mixer])
+
+    def run(self):
+        self.mixer.mix()
+        self.radiation.differentiate()
+        self.output[:] = self.radiation.output[:]
+
+
+class KlattOutput(KlattSection):
+    def __init__(self, master, input_connect):
+        KlattSection.__init__(self, master)
+        self.normalizer = Normalizer(master=self.master,
+                                     input_connect=input_connect)
+
+    def run(self):
+        self.normalizer.normalize()
+        self.output[:] = self.normalizer.output[:]
 
 
 class KlattComponent:
@@ -423,3 +503,27 @@ class Lowpass(KlattComponent):
         self.output[0] = self.input[0]
         for n in range(1, self.master.params["N_SAMP"]):
             self.output[n] = self.input[n] + self.output[n-1]
+
+
+class Normalizer(KlattComponent):
+    """
+    Normalizes signal so that abs(max value) is 1.
+    """
+    def __init__(self, master, input_connect):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def normalize(self):
+        self.pull()
+        self.output[:] = self.input[:]/np.max(np.abs(self.input[:]))
+
+
+class Noisegen(KlattComponent):
+    """
+    Generates noise from a Gaussian distribution.
+    """
+    def __init__(self, master, input_connect=None):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def generate(self):
+        self.output[:] = np.random.normal(loc=0.0, scale=1.0,
+                                          size=self.master.params["N_SAMP"])
