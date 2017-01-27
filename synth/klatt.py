@@ -51,11 +51,13 @@ class NTVParameters:
     """
     def __init__(self, FS=10000,
                        N_FORM=5,
-                       DUR=1):
+                       DUR=1,
+                       VER="1980"):
         self.FS = FS
         self.DUR = DUR
         self.N_FORM = N_FORM
         self.N_SAMP = round(FS*DUR)
+        self.VER = VER
 
 
 class TVParameters:
@@ -82,6 +84,12 @@ class TVParameters:
                        BNP=100,
                        BNZ=100,
                        BGS=200,
+                       A1=0,
+                       A2=0,
+                       A3=0,
+                       A4=0,
+                       A5=0,
+                       AN=0,
                        track_npoints=80):
         self.F0 = F0
         self.FF = [Track(np.ones(track_npoints)*FF[i]) for i in range(N_FORM)]
@@ -100,6 +108,12 @@ class TVParameters:
         self.BNP = BNP
         self.BNZ = BNZ
         self.BGS = BGS
+        self.A1 = A1
+        self.A2 = A2
+        self.A3 = A3
+        self.A4 = A4
+        self.A5 = A5
+        self.AN = AN
 
 
 class Track:
@@ -125,7 +139,7 @@ class Track:
             self.points = np.concatenate((self.points, vector_to_be_appended))
 
 
-def fake_parms():
+def klatt_fake():
     """
     Temporary utility function to create fake set of parameters for testing.
     """
@@ -141,6 +155,9 @@ def klatt_make(tvparams, ntvparams):
         tvparams --- time-varying parameters object
         ntvparams --- non-time-varying parameters object
     """
+    if tvparams is None or ntvparams is None:
+        tvparams, ntvparams = klatt_fake()
+
     # Initialize synth
     synth = KlattSynth()
 
@@ -212,6 +229,10 @@ class KlattSynth(object):
         self.name = "Klatt 1988 Synthesizer"
         self.algorithm = "KLSYN88+"
 
+        # Initialize empty attributes
+        self.output = None
+        self.sections = None
+
         # Initialize synthesis parameters dictionary
         param_list = ["F0", "AV", "OQ", "SQ", "TL", "FL", # Source
                       "DI", "AVS", "AV", "AF", "AH",      # Source
@@ -222,9 +243,10 @@ class KlattSynth(object):
                       "A2F", "A3F", "A4F", "A5F", "A6F",  # Frication parallel
                       "B2F", "B3F", "B4F", "B5F", "B6F",  # Frication parallel
                       "A1V", "A2V", "A3V", "A4V", "ATV",  # Voicing parallel
+                      "A1", "A2", "A3", "A4", "A5", "AN", # 1980 parallel
                       "ANV",                              # Voicing parallel
                       "SW", "INV_SAMP", "N_INV", "N_FORM",# Synth settings
-                      "N_SAMP", "FS", "DT"]               # Synth settings
+                      "N_SAMP", "FS", "DT", "VER"]        # Synth settings
         self.params = {param: None for param in param_list}
 
     def setup(self):
@@ -240,23 +262,28 @@ class KlattSynth(object):
         # Derive dt
         self.params["DT"] = 1/self.params["FS"]
 
-        # Initialize sections
-        self.voice = KlattVoice1980(self)
-        self.noise = KlattNoise1980(self)
-        self.cascade = KlattCascade(self, [self.voice, self.noise])
-        # self.parallel = KlattParallel(self, [self.voice, self.noise])
-        self.radiation = KlattRadiation(self, [self.cascade])
-        self.output_module = KlattOutput(self, [self.radiation])
+        # Differential functiontioning based on version...
+        if self.params["VER"] == "1980":
+            # Initialize sections
+            self.voice = KlattVoice1980(self)
+            self.noise = KlattNoise1980(self)
+            self.cascade = KlattCascade1980(self, [self.voice, self.noise])
+            self.parallel = KlattParallel1980(self, [self.voice, self.noise])
+            self.radiation = KlattRadiation(self, [self.cascade, self.parallel])
+            self.output_module = KlattOutput(self, [self.radiation])
+            self.sections = [self.voice, self.noise, self.cascade,
+                             self.parallel, self.radiation, self.output_module]
+        else:
+            print("Sorry, versions other than Klatt 1980 are not supported.")
 
     def run(self):
-        self.voice.run()
-            #self.noise.run()
-        self.cascade.run()
-        self.radiation.run()
-        self.output_module.run()
+        self.output[:] = np.zeros(self.params["N_SAMP"])
+        for section in self.sections:
+            section.run()
         self.output[:] = self.output_module.output[:]
 
 
+##### BEGIN SECTIONS #####
 class KlattSection:
     """
     Parent class for section-level objects in the TrackDraw synthesizer.
@@ -318,7 +345,7 @@ class KlattNoise1980(KlattSection):
         self.amp.amplify(dB=-100)
         self.output[:] = self.amp.output[:]
 
-class KlattCascade(KlattSection):
+class KlattCascade1980(KlattSection):
     """
     Simulates a vocal tract with a cascade of resonators.
     """
@@ -352,6 +379,64 @@ class KlattCascade(KlattSection):
         self.output[:] = self.formants[-1].output[:]
 
 
+class KlattParallel1980(KlattSection):
+    """
+    Simulates a vocal tract with a bank of parallel resonators.
+    """
+    def __init__(self, master, input_connect):
+        KlattSection.__init__(self, master)
+        self.af = Amplifier(master=self.master, input_connect=[input_connect[1]])
+        self.a1 = Amplifier(master=self.master, input_connect=[input_connect[0]])
+        self.r1 = Resonator(master=self.master, input_connect=[self.a1])
+        self.first_diff = Firstdiff(master=self.master,
+                                    input_connect=[input_connect[0]])
+        self.mixer = Mixer(master=self.master,
+                           input_connect=[self.first_diff, self.af])
+        self.an = Amplifier(master=self.master, input_connect=[self.mixer])
+        self.rnp = Resonator(master=self.master, input_connect=[self.an])
+        self.a2 = Amplifier(master=self.master, input_connect=[self.mixer])
+        self.r2 = Resonator(master=self.master, input_connect=[self.a2])
+        self.a3 = Amplifier(master=self.master, input_connect=[self.mixer])
+        self.r3 = Resonator(master=self.master, input_connect=[self.a3])
+        self.a4 = Amplifier(master=self.master, input_connect=[self.mixer])
+        self.r4 = Resonator(master=self.master, input_connect=[self.a4])
+        self.a5 = Amplifier(master=self.master, input_connect=[input_connect[1]])
+        self.r5 = Resonator(master=self.master, input_connect=[self.a5])
+        # 6th formant currently not part of run routine! Not sure what values
+        # to give to it... need to keep reading Klatt 1980.
+        self.a6 = Amplifier(master=self.master, input_connect=[input_connect[1]])
+        self.r6 = Resonator(master=self.master, input_connect=[self.a6])
+        self.output_mixer = Mixer(master=self.master,
+                                  input_connect=[self.r1, self.rnp, self.r2,
+                                                 self.r3, self.r4, self.r5,
+                                                 self.r6])
+
+    def run(self):
+        self.af.amplify(dB=self.master.params["AF"])
+        self.a1.amplify(dB=self.master.params["A1"])
+        self.r1.resonate(ff=self.master.params["FF"][0],
+                         bw=self.master.params["BW"][0])
+        self.first_diff.differentiate()
+        self.mixer.mix()
+        self.an.amplify(dB=self.master.params["AN"])
+        self.rnp.resonate(ff=self.master.params["FNP"],
+                          bw=self.master.params["BNP"])
+        self.a2.amplify(dB=self.master.params["A2"])
+        self.r2.resonate(ff=self.master.params["FF"][1],
+                         bw=self.master.params["BW"][1])
+        self.a3.amplify(dB=self.master.params["A3"])
+        self.r3.resonate(ff=self.master.params["FF"][2],
+                         bw=self.master.params["BW"][2])
+        self.a4.amplify(dB=self.master.params["A4"])
+        self.r4.resonate(ff=self.master.params["FF"][3],
+                         bw=self.master.params["BW"][3])
+        self.a5.amplify(dB=self.master.params["A5"])
+        self.r5.resonate(ff=self.master.params["FF"][4],
+                         bw=self.master.params["BW"][4])
+        self.output_mixer.mix()
+        self.output[:] = self.output_mixer.output[:]
+
+
 class KlattRadiation(KlattSection):
     """
     Simulates the effect of radiation characteristic in the vocal tract.
@@ -378,8 +463,10 @@ class KlattOutput(KlattSection):
     def run(self):
         self.normalizer.normalize()
         self.output[:] = self.normalizer.output[:]
+##### END SECTIONS #####
 
 
+##### START COMPONENTS #####
 class KlattComponent:
     """
     Parent class for component-level objects in the TrackDraw synthesizer.
@@ -527,3 +614,4 @@ class Noisegen(KlattComponent):
     def generate(self):
         self.output[:] = np.random.normal(loc=0.0, scale=1.0,
                                           size=self.master.params["N_SAMP"])
+##### END COMPONENTS #####
