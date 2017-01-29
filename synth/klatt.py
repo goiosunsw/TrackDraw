@@ -270,7 +270,7 @@ class KlattSynth(object):
             self.cascade = KlattCascade1980(self, [self.voice, self.noise])
             self.parallel = KlattParallel1980(self, [self.voice, self.noise])
             self.radiation = KlattRadiation(self, [self.cascade, self.parallel])
-            self.output_module = KlattOutput(self, [self.radiation])
+            self.output_module = Output(self, [self.radiation])
             self.sections = [self.voice, self.noise, self.cascade,
                              self.parallel, self.radiation, self.output_module]
         else:
@@ -437,6 +437,41 @@ class KlattParallel1980(KlattSection):
         self.output[:] = self.output_mixer.output[:]
 
 
+class KlattCascade1988(KlattSection):
+    """
+    Simulates a vocal tract with a cascade of resonators.
+    """
+    def __init__(self, master, input_connect):
+        KlattSection.__init__(self, master)
+        self.np = Resonator(master=self.master, input_connect=input_connect)
+        self.nz = Resonator(master=self.master,input_connect=[self.np],
+                            anti=True)
+        self.tp = Resonator(master=self.master,input_connect=[self.nz])
+        self.tz = Resonator(master=self.master, input_connect=[self.tp],
+                            anti=True)
+        self.formants = []
+        self.formants.append(Resonator(master=self.master,
+                                       input_connect=[self.tz]))
+        previous_formant = self.formants[0]
+        for form in range(1, self.master.params["N_FORM"]):
+            self.formants.append(Resonator(master=self.master, input_connect=[previous_formant]))
+            previous_formant = self.formants[form]
+
+    def run(self):
+        self.np.resonate(ff=self.master.params["FNP"],
+                          bw=self.master.params["BNP"])
+        self.nz.resonate(ff=self.master.params["FNZ"],
+                          bw=self.master.params["BNZ"])
+        self.tp.resonate(ff=self.master.params["FTP"],
+                         bw=self.master.params["BTP"])
+        self.tz.resonate(ff=self.master.params["FTZ"],
+                         bw=self.master.params["BTZ"])
+        for form in range(len(self.formants)):
+            self.formants[form].resonate(ff=self.master.params["FF"][form],
+                                         bw=self.master.params["BW"][form])
+        self.output[:] = self.formants[-1].output[:]
+
+
 class KlattRadiation(KlattSection):
     """
     Simulates the effect of radiation characteristic in the vocal tract.
@@ -454,7 +489,7 @@ class KlattRadiation(KlattSection):
         self.output[:] = self.radiation.output[:]
 
 
-class KlattOutput(KlattSection):
+class Output(KlattSection):
     def __init__(self, master, input_connect):
         KlattSection.__init__(self, master)
         self.normalizer = Normalizer(master=self.master,
@@ -614,4 +649,5 @@ class Noisegen(KlattComponent):
     def generate(self):
         self.output[:] = np.random.normal(loc=0.0, scale=1.0,
                                           size=self.master.params["N_SAMP"])
+
 ##### END COMPONENTS #####
