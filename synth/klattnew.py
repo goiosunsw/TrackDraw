@@ -68,13 +68,18 @@ class KlattSynth(object):
             self.voice = KlattVoice1980(self)
             self.noise = KlattNoise1980(self)
             self.cascade = KlattCascade1980(self)
+            self.parallel = KlattParallel1980(self)
+            self.radiation = KlattRadiation1980(self)
             self.output_module = OutputModule(self)
             # Run wires
-            self.voice.connect(self.cascade)
-            self.noise.connect(self.cascade)
-            self.cascade.connect(self.output_module)
+            self.voice.connect([self.cascade, self.parallel])
+            self.noise.connect([self.cascade, self.parallel])
+            self.cascade.connect([self.radiation])
+            self.parallel.connect([self.radiation])
+            self.radiation.connect([self.output_module])
             # Put all section objects into self.sections
-            self.sections = [self.voice, self.noise, self.cascade, self.output_module]
+            self.sections = [self.voice, self.noise, self.cascade,
+                             self.parallel, self.radiation, self.output_module]
             # Patch all components together
             for section in self.sections:
                 section.patch()
@@ -101,9 +106,10 @@ class KlattSection:
         self.ins = []
         self.outs = []
 
-    def connect(self, section):
-        section.ins.append(Buffer(mast=self.mast))
-        self.outs.append(Buffer(mast=self.mast, dests=[section.ins[-1]]))
+    def connect(self, sections):
+        for section in sections:
+            section.ins.append(Buffer(mast=self.mast))
+            self.outs.append(Buffer(mast=self.mast, dests=[section.ins[-1]]))
 
     def process_ins(self):
         for _in in self.ins:
@@ -120,9 +126,12 @@ class KlattComponent:
 
     TODO - Write connect() method to remove item.dests = nonsense
     """
-    def __init__(self, mast):
+    def __init__(self, mast, dests=None):
         self.mast = mast
-        self.dests = []
+        if dests is None:
+            self.dests = []
+        else:
+            self.dests = dests
         self.input = np.zeros(self.mast.params["N_SAMP"])
         self.output = np.zeros(self.mast.params["N_SAMP"])
 
@@ -139,6 +148,13 @@ class KlattComponent:
         for dest in self.dests:
             dest.receive(signal=self.output[:])
 
+    def connect(self, components):
+        """
+        Provides interface to change dests
+        """
+        for component in components:
+            self.dests.append(component)
+
 
 ##### SECTION DEFINITIONS #####
 class KlattVoice1980(KlattSection):
@@ -154,6 +170,7 @@ class KlattVoice1980(KlattSection):
         self.av = Amplifier(mast=self.mast)
         self.avs = Amplifier(mast=self.mast)
         self.mixer = Mixer(mast=self.mast)
+        self.switch = Switch(mast=self.mast)
 
     def patch(self):
         self.impulse.dests = [self.rgp]
@@ -162,7 +179,8 @@ class KlattVoice1980(KlattSection):
         self.rgs.dests = [self.avs]
         self.av.dests = [self.mixer]
         self.avs.dests = [self.mixer]
-        self.mixer.dests = [*self.outs]
+        self.mixer.dests = [self.switch]
+        self.switch.dests = [*self.outs]
 
     def run(self):
         self.impulse.impulse_gen()
@@ -175,6 +193,7 @@ class KlattVoice1980(KlattSection):
         self.av.amplify(dB=self.mast.params["AV"])
         self.avs.amplify(dB=self.mast.params["AVS"])
         self.mixer.mix()
+        self.switch.operate(choice=self.mast.params["SW"])
         self.process_outs()
 
 
@@ -245,7 +264,7 @@ class KlattParallel1980(KlattSection):
 
     TODO - Finish putting together connections, test.
     """
-    def __init__(self, mast, input_connect):
+    def __init__(self, mast):
         KlattSection.__init__(self, mast)
         self.af = Amplifier(mast=self.mast)
         self.a1 = Amplifier(mast=self.mast)
@@ -269,14 +288,25 @@ class KlattParallel1980(KlattSection):
         self.output_mixer = Mixer(mast=self.mast)
 
     def patch(self):
-        self.ins[1].connect(self.af)
+        self.ins[1].connect([self.af])
         self.ins[0].connect([self.a1, self.first_diff])
-        self.af.connect(self.mixer)
-        self.first_diff.connect(self.mixer)
+        self.af.connect([self.mixer, self.a5, self.a6])
+        self.first_diff.connect([self.mixer])
         self.mixer.connect([self.an, self.a2, self.a3, self.a4])
-        self.an.connect(self.rnp)
+        self.a1.connect([self.r1])
+        self.an.connect([self.rnp])
+        self.a2.connect([self.r2])
+        self.a3.connect([self.r3])
+        self.a4.connect([self.r4])
+        self.a5.connect([self.r5])
+        self.r6.connect([self.r6])
+        for item in [self.a1, self.an, self.a2, self.a3, self.a4, self.a5,
+                     self.a6]:
+            item.connect([self.output_mixer])
+        self.output_mixer.connect([*self.outs])
 
     def run(self):
+        self.process_ins()
         self.af.amplify(dB=self.mast.params["AF"])
         self.a1.amplify(dB=self.mast.params["A1"])
         self.r1.resonate(ff=self.mast.params["FF"][0],
@@ -299,22 +329,47 @@ class KlattParallel1980(KlattSection):
         self.r5.resonate(ff=self.mast.params["FF"][4],
                          bw=self.mast.params["BW"][4])
         self.output_mixer.mix()
-        self.output[:] = self.output_mixer.output[:]
+        self.process_outs()
 
+
+class KlattRadiation1980(KlattSection):
+    """
+    Simulates the effect of radiation characteristic in the vocal tract.
+    """
+    def __init__(self, mast):
+        KlattSection.__init__(self, mast)
+        self.mixer = Mixer(mast=self.mast)
+        self.firstdiff = Firstdiff(mast=self.mast)
+
+    def patch(self):
+        for _in in self.ins:
+            _in.connect([self.mixer])
+        self.mixer.connect([self.firstdiff])
+        self.firstdiff.connect([*self.outs])
+
+    def run(self):
+        self.process_ins()
+        self.mixer.mix()
+        self.firstdiff.differentiate()
+        self.process_outs()
 
 
 class OutputModule(KlattSection):
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
+        self.mixer = Mixer(mast=self.mast)
         self.normalizer = Normalizer(mast=self.mast)
         self.output = np.zeros(self.mast.params["N_SAMP"])
 
     def patch(self):
-        self.ins[0].dests = [self.normalizer]
+        for _in in self.ins:
+            _in.dests = [self.mixer]
+        self.mixer.dests = [self.normalizer]
         self.normalizer.dests = [*self.outs]
 
     def run(self):
         self.process_ins()
+        self.mixer.mix()
         self.normalizer.normalize()
         self.output[:] = self.normalizer.output[:]
 
@@ -423,6 +478,7 @@ class Firstdiff(KlattComponent):
         self.output[0] = self.input[0]
         for n in range(1, self.mast.params["N_SAMP"]):
             self.output[n] = self.input[n] - self.input[n-1]
+        self.send()
 
 
 class Lowpass(KlattComponent):
