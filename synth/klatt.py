@@ -345,6 +345,7 @@ class KlattNoise1980(KlattSection):
         self.amp.amplify(dB=-100)
         self.output[:] = self.amp.output[:]
 
+
 class KlattCascade1980(KlattSection):
     """
     Simulates a vocal tract with a cascade of resonators.
@@ -508,8 +509,9 @@ class KlattComponent:
     """
     def __init__(self, master, input_connect=None):
         self.master = master
-        self.input = np.zeros(self.master.params["N_SAMP"])
-        self.output = np.zeros(self.master.params["N_SAMP"])
+        self.input = []
+        self.input.append(np.zeros(self.master.params["N_SAMP"]))
+        self.output.append(np.zeros(self.master.params["N_SAMP"]))
         self.input_connect = input_connect
 
     def pull(self):
@@ -649,5 +651,20 @@ class Noisegen(KlattComponent):
     def generate(self):
         self.output[:] = np.random.normal(loc=0.0, scale=1.0,
                                           size=self.master.params["N_SAMP"])
+
+
+class Switch(KlattComponent):
+    """
+    Switches between two input
+    """
+    def __init__(self, master, input_connect=None):
+        KlattComponent.__init__(self, master, input_connect)
+
+    def choose(self, choice):
+        if self.choice == 0:
+            self.output[:] = self.input_connect[0].output[:]
+        elif self.choice == 1:
+            self.output[:] = self.input_connect[1].output[:]
+
 
 ##### END COMPONENTS #####
