@@ -2,21 +2,40 @@ class KlattSynth(object):
     """
     Synthesizes speech ala Klatt 1980 and Klatt 1990.
 
+    Attributes:
+        name (string): Name of this synthesizer
+        output (None): Output vector for the synthesizer, set by setup()
+            later
+        sections (None): List of sections in the synthesizer, set by
+            setup() later
+        param_list (list): List of valid parameter names
+        params (dictionary): Dictionary of parameters, all entries are
+            initialized as None and must be set by external operations
+
     KlattSynth contains all necessary synthesis parameters in an attribute
     called params. The synthesis routine is organized around the concept of
-    sections and components. Sections are objects with represent organizational
+    sections and components. Sections are objects which represent organizational
     abstractions drawn from the Klatt 1980 paper. Each section is composed of
     muiltiple components, which are small signal processing units like
     individual filters, resonators, amplifiers, etc. Each section has a run()
     method with performs the operation that section is designed to do. For
     example, a KlattVoice section's run() method generates a voicing waveform.
 
-    KlattSynth's param attribute will need to be provided with paramters, there
+    KlattSynth's params attribute will need to be provided with paramters, there
     are no built-in defaults! Currently the only way to do so is to generate a
-    KlattSynth object through the klatt_make function or to do so manually.
-    Eventually, I will add other options...
+    KlattSynth object through the klatt_make function available in klattface.py
+    or to do so manually. params is just a dictionary that can be directly
+    addressed, so setting parameters is easy. One important caveat is that any
+    time-varying parameters (i.e., all parameters except those labelled
+    "synth settings" below) should be numpy arrays of length N_SAMP.
 
-    KlattSynth is not designed for real-time operation in any way.
+    KlattSynth, while designed around the original Klatt formant synthesizer,
+    is designed to be flexible and modular. It supports multiple versions of
+    the Klatt synthesis routine and is easily extensible, so you easily add
+    custom components and sections to suit your needs.
+
+    Current supported synthesis routines:
+        - Klatt 1980, "KLSYN80"
     """
     def __init__(self):
         """
@@ -26,8 +45,7 @@ class KlattSynth(object):
         synthesis type. Also creates the parameter list, but leaves it blank.
         """
         # Create tags
-        self.name = "Klatt 1988 Synthesizer"
-        self.algorithm = "KLSYN88+"
+        self.name = "Klatt Formant Synthesizer"
 
         # Initialize empty attributes
         self.output = None
@@ -45,16 +63,20 @@ class KlattSynth(object):
                       "A1V", "A2V", "A3V", "A4V", "ATV",  # Voicing parallel
                       "A1", "A2", "A3", "A4", "A5", "AN", # 1980 parallel
                       "ANV",                              # Voicing parallel
-                      "SW", "INV_SAMP", "N_INV", "N_FORM",# Synth settings
+                      "SW", "INV_SAMP",                   # Synth settings
                       "N_SAMP", "FS", "DT", "VER"]        # Synth settings
         self.params = {param: None for param in param_list}
 
     def setup(self):
         """
-        Sets up Klatt synthesizer.
+        Sets up KlattSynth.
 
-        Run after parameter values are set, creates output vector, derives
-        necessary variables from input parameters, initializes sections.
+        Run after parameter values are set, initializes output vector, derives
+        necessary variables from input parameters, initializes sections and
+        sets them to be attributes.
+
+        NOTE, it's probably bad practice to create new attributes outside of
+        __init__(), but...
         """
         # Initialize data vectors
         self.output = np.zeros(self.params["N_SAMP"])
@@ -63,30 +85,36 @@ class KlattSynth(object):
         self.params["DT"] = 1/self.params["FS"]
 
         # Differential functiontioning based on version...
-        if self.params["VER"] == "1980":
-            # Initialize section objects
+        if self.params["VER"] == "KLYSN80":
+            # Initialize sections
             self.voice = KlattVoice1980(self)
             self.noise = KlattNoise1980(self)
             self.cascade = KlattCascade1980(self)
             self.parallel = KlattParallel1980(self)
             self.radiation = KlattRadiation1980(self)
             self.output_module = OutputModule(self)
-            # Run wires
+            # Create section-level connections
             self.voice.connect([self.cascade, self.parallel])
             self.noise.connect([self.cascade, self.parallel])
             self.cascade.connect([self.radiation])
             self.parallel.connect([self.radiation])
             self.radiation.connect([self.output_module])
-            # Put all section objects into self.sections
+            # Put all section objects into self.sections for reference
             self.sections = [self.voice, self.noise, self.cascade,
                              self.parallel, self.radiation, self.output_module]
-            # Patch all components together
+            # Patch all components together within sections
             for section in self.sections:
                 section.patch()
         else:
             print("Sorry, versions other than Klatt 1980 are not supported.")
 
     def run(self):
+        """
+        Runs KlattSynth.
+
+        Sets output to zero, then runs each component before extracting output
+        from the final section (output_module).
+        """
         self.output[:] = np.zeros(self.params["N_SAMP"])
         for section in self.sections:
             section.run()
@@ -98,8 +126,23 @@ class KlattSection:
     """
     Parent class for section-level objects in TrackDraw synth system.
 
-    TODO - parcel out parameter setting, probably wasteful but potentially
-    worthwile?.
+    Arguments:
+        mast (KlattSynth object): Master KlattSynth object, allows all
+            sub-components to access params
+
+    Attributes:
+        mast (KlattSynth object): Master KlattSynth object, allows all
+            sub-components to access params
+        ins (list): list of Buffer objects for handling this Section's
+            inputs, if it has any
+        outs (list): list of Buffer objects for handling this Section's
+            outputs, if it has any
+
+    An operational Section needs two custom methods to be implemented on top of
+    the default methods provided by the class definition:
+        patch(), which describes how components should be connected, and
+        run(), which describes the order in which components should be run and
+            what parameters they should use during their operation
     """
     def __init__(self, mast):
         self.mast = mast
@@ -107,15 +150,40 @@ class KlattSection:
         self.outs = []
 
     def connect(self, sections):
+        """
+        Connects this section to another.
+
+        Arguments:
+            sections (list): list of Section objects to be connected to this
+                Section
+
+        For each Section in sections, this method appends a Buffer to that
+        Section's outs and another Buffer to this section's ins. It also
+        connects the two so that signals propogate between them. See the doc
+        strings for the Component level operations of connect, send, and
+        receive to understand more about how this signal propogation occurs.
+        """
         for section in sections:
             section.ins.append(Buffer(mast=self.mast))
             self.outs.append(Buffer(mast=self.mast, dests=[section.ins[-1]]))
 
     def process_ins(self):
+        """
+        Processes all input buffers.
+
+        Calls the Buffer's process() method for each Buffer in this section's
+        ins. Utility method for easy input processing.
+        """
         for _in in self.ins:
             _in.process()
 
     def process_outs(self):
+        """
+        Processes all output buffers.
+
+        Calls the Buffer's process() method for each Buffer in this section's
+        outs. Utility method for easy output processing.
+        """
         for out in self.outs:
             out.process()
 
@@ -124,7 +192,28 @@ class KlattComponent:
     """
     Parent class for component-level objects in TrackDraw synth system.
 
-    TODO - Write connect() method to remove item.dests = nonsense
+    Arguments:
+        mast (KlattSynth): master KlattSynth object, allows for access to
+            params
+        dests (list): list of other Components, see send() method doc string
+            for more information on how this list is used
+
+    Attributes:
+        mast (KlattSynth): master KlattSynth object, allows for access to
+            params
+        dests (list): list of other Components, see send() method doc string
+            for more information on how this list is used
+        input (Numpy array): input vector, length N_SAMP
+        output (Numpy array): output vector, length N_SAMP
+
+    Components are small signal processing units (e.g., filters, amplifiers)
+    which compose Sections. Components are connected at the Section level using
+    the Components' connect() method. Components use the send() and receive()
+    methods to perpetuate the signal down the signal chain.
+
+    Components should all have a custom method implemented in which, at the
+    very least, some output is put in the output attribute and, at the end of
+    processing, the send() method is called.
     """
     def __init__(self, mast, dests=None):
         self.mast = mast
@@ -138,19 +227,39 @@ class KlattComponent:
     def receive(self, signal):
         """
         Updates current signal.
+
+        Arguments:
+            signal (NumPy array): vector to change input to
+
+        Used by the send() method to propogate the signal through the chain of
+        components, changes this Component's input attribute to be equal to the
+        signal argument.
         """
         self.input[:] = signal[:]
 
     def send(self):
         """
         Perpetuates signal to components further down in the chain.
+
+        For each Component in this Component's dests list, uses the
+        receive() method to set that Component's input to this Component's
+        output, thereby propagating the signal through the chain of components.
+
+        NOTE - Mixer has a custom implementation of receive, but it interfaces
+        identically, so you don't need to worry about it.
         """
         for dest in self.dests:
             dest.receive(signal=self.output[:])
 
     def connect(self, components):
         """
-        Provides interface to change dests
+        Connects two components together.
+
+        Arguments:
+            components (list): list of Components to be connected to
+
+        For each destination Component in the list components, adds the
+        destination Component to this Component's dests.
         """
         for component in components:
             self.dests.append(component)
@@ -173,14 +282,14 @@ class KlattVoice1980(KlattSection):
         self.switch = Switch(mast=self.mast)
 
     def patch(self):
-        self.impulse.dests = [self.rgp]
-        self.rgp.dests = [self.rgz, self.rgs]
-        self.rgz.dests = [self.av]
-        self.rgs.dests = [self.avs]
-        self.av.dests = [self.mixer]
-        self.avs.dests = [self.mixer]
-        self.mixer.dests = [self.switch]
-        self.switch.dests = [*self.outs]
+        self.impulse.connect([self.rgp])
+        self.rgp.connect([self.rgz, self.rgs])
+        self.rgz.connect([self.av])
+        self.rgs.connect([self.avs])
+        self.av.connect([self.mixer])
+        self.avs.connect([self.mixer])
+        self.mixer.connect([self.switch])
+        self.switch.connect([*self.outs])
 
     def run(self):
         self.impulse.impulse_gen()
@@ -208,14 +317,14 @@ class KlattNoise1980(KlattSection):
         self.amp = Amplifier(mast=self.mast)
 
     def patch(self):
-        self.noisegen.dests = [self.lowpass]
-        self.lowpass.dests = [self.amp]
-        self.amp.dests = [*self.outs]
+        self.noisegen.connect([self.lowpass])
+        self.lowpass.connect([self.amp])
+        self.amp.connect([*self.outs])
 
     def run(self):
         self.noisegen.generate()
         self.lowpass.filter()
-        self.amp.amplify(dB=-100)
+        self.amp.amplify(dB=-1000)
         self.process_outs()
 
 
@@ -234,15 +343,15 @@ class KlattCascade1980(KlattSection):
             self.formants.append(Resonator(mast=self.mast))
 
     def patch(self):
-        self.ins[0].dests = [self.mixer]
-        self.ins[1].dests = [self.ah]
-        self.ah.dests = [self.mixer]
-        self.mixer.dests = [self.rnp]
-        self.rnp.dests = [self.rnz]
-        self.rnz.dests = [self.formants[0]]
+        self.ins[0].connect([self.mixer])
+        self.ins[1].connect([self.ah])
+        self.ah.connect([self.mixer])
+        self.mixer.connect([self.rnp])
+        self.rnp.connect([self.rnz])
+        self.rnz.connect([self.formants[0]])
         for i in range(0, self.mast.params["N_FORM"]-1):
-            self.formants[i].dests = [self.formants[i+1]]
-        self.formants[self.mast.params["N_FORM"]-1].dests = [*self.outs]
+            self.formants[i].connect([self.formants[i+1]])
+        self.formants[self.mast.params["N_FORM"]-1].connect([*self.outs])
 
     def run(self):
         self.process_ins()
@@ -261,8 +370,6 @@ class KlattCascade1980(KlattSection):
 class KlattParallel1980(KlattSection):
     """
     Simulates a vocal tract with a bank of parallel resonators.
-
-    TODO - Finish putting together connections, test.
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -545,12 +652,3 @@ class Switch(KlattComponent):
                 self.output[0][n] = 0
                 self.output[1][1] = self.input[n]
         self.send()
-
-
-def q():
-    tvp, ntvp = klatt_fake()
-    s = klatt_make(tvp, ntvp)
-    s.run()
-    plt.plot(s.output)
-    plt.show()
-    return(s)
