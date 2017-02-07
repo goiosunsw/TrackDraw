@@ -141,7 +141,7 @@ class KlattSection:
     An operational Section needs two custom methods to be implemented on top of
     the default methods provided by the class definition:
         patch(), which describes how components should be connected, and
-        run(), which describes the order in which components should be run and
+        do(), which describes the order in which components should be run and
             what parameters they should use during their operation
     """
     def __init__(self, mast):
@@ -186,6 +186,19 @@ class KlattSection:
         """
         for out in self.outs:
             out.process()
+
+    def run(self):
+        """
+        Carries out processing of this Section.
+
+        If ins is not empty, processes ins. Then calls this Section's custom
+        do() method. Then, if outs is not empty, processes outs.
+        """
+        if self.ins is not None:
+            self.process_ins()
+        self.do()
+        if self.outs is not None:
+            self.process_outs()
 
 
 class KlattComponent:
@@ -291,7 +304,7 @@ class KlattVoice1980(KlattSection):
         self.mixer.connect([self.switch])
         self.switch.connect([*self.outs])
 
-    def run(self):
+    def do(self):
         self.impulse.impulse_gen()
         self.rgp.resonate(ff=self.mast.params["FGP"],
                           bw=self.mast.params["BGP"])
@@ -303,7 +316,6 @@ class KlattVoice1980(KlattSection):
         self.avs.amplify(dB=self.mast.params["AVS"])
         self.mixer.mix()
         self.switch.operate(choice=self.mast.params["SW"])
-        self.process_outs()
 
 
 class KlattNoise1980(KlattSection):
@@ -321,11 +333,10 @@ class KlattNoise1980(KlattSection):
         self.lowpass.connect([self.amp])
         self.amp.connect([*self.outs])
 
-    def run(self):
+    def do(self):
         self.noisegen.generate()
         self.lowpass.filter()
         self.amp.amplify(dB=-1000)
-        self.process_outs()
 
 
 class KlattCascade1980(KlattSection):
@@ -353,8 +364,7 @@ class KlattCascade1980(KlattSection):
             self.formants[i].connect([self.formants[i+1]])
         self.formants[self.mast.params["N_FORM"]-1].connect([*self.outs])
 
-    def run(self):
-        self.process_ins()
+    def do(self):
         self.ah.amplify(dB=self.mast.params["AH"])
         self.mixer.mix()
         self.rnp.resonate(ff=self.mast.params["FNP"],
@@ -364,7 +374,6 @@ class KlattCascade1980(KlattSection):
         for form in range(len(self.formants)):
             self.formants[form].resonate(ff=self.mast.params["FF"][form],
                                          bw=self.mast.params["BW"][form])
-        self.process_outs()
 
 
 class KlattParallel1980(KlattSection):
@@ -412,8 +421,7 @@ class KlattParallel1980(KlattSection):
             item.connect([self.output_mixer])
         self.output_mixer.connect([*self.outs])
 
-    def run(self):
-        self.process_ins()
+    def do(self):
         self.af.amplify(dB=self.mast.params["AF"])
         self.a1.amplify(dB=self.mast.params["A1"])
         self.r1.resonate(ff=self.mast.params["FF"][0],
@@ -436,7 +444,6 @@ class KlattParallel1980(KlattSection):
         self.r5.resonate(ff=self.mast.params["FF"][4],
                          bw=self.mast.params["BW"][4])
         self.output_mixer.mix()
-        self.process_outs()
 
 
 class KlattRadiation1980(KlattSection):
@@ -454,11 +461,9 @@ class KlattRadiation1980(KlattSection):
         self.mixer.connect([self.firstdiff])
         self.firstdiff.connect([*self.outs])
 
-    def run(self):
-        self.process_ins()
+    def do(self):
         self.mixer.mix()
         self.firstdiff.differentiate()
-        self.process_outs()
 
 
 class OutputModule(KlattSection):
@@ -474,8 +479,7 @@ class OutputModule(KlattSection):
         self.mixer.dests = [self.normalizer]
         self.normalizer.dests = [*self.outs]
 
-    def run(self):
-        self.process_ins()
+    def do(self):
         self.mixer.mix()
         self.normalizer.normalize()
         self.output[:] = self.normalizer.output[:]

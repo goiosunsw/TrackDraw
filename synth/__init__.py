@@ -7,4 +7,5 @@ Created on Thu Jul  7 12:48:00 2016
 """
 
 import synth.klatt
+import synth.klattinterface
 import synth.sine
