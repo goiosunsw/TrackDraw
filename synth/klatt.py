@@ -85,7 +85,7 @@ class KlattSynth(object):
         self.params["DT"] = 1/self.params["FS"]
 
         # Differential functiontioning based on version...
-        if self.params["VER"] == "KLYSN80":
+        if self.params["VER"] == "KLSYN80":
             # Initialize sections
             self.voice = KlattVoice1980(self)
             self.noise = KlattNoise1980(self)
@@ -397,16 +397,19 @@ class KlattParallel1980(KlattSection):
         self.r4 = Resonator(mast=self.mast)
         self.a5 = Amplifier(mast=self.mast)
         self.r5 = Resonator(mast=self.mast)
-        # 6th formant currently not part of run routine! Not sure what values
+        # 6th formant currently not part of self.do()! Not sure what values
         # to give to it... need to keep reading Klatt 1980.
         self.a6 = Amplifier(mast=self.mast)
         self.r6 = Resonator(mast=self.mast)
+        # ab currently not part of self.do()! Not sure what values to give
+        # to it... need to keep reading Klatt 1980.
+        self.ab = Amplifier(mast=self.mast)
         self.output_mixer = Mixer(mast=self.mast)
 
     def patch(self):
         self.ins[1].connect([self.af])
         self.ins[0].connect([self.a1, self.first_diff])
-        self.af.connect([self.mixer, self.a5, self.a6])
+        self.af.connect([self.mixer, self.a5, self.a6, self.ab])
         self.first_diff.connect([self.mixer])
         self.mixer.connect([self.an, self.a2, self.a3, self.a4])
         self.a1.connect([self.r1])
@@ -416,8 +419,8 @@ class KlattParallel1980(KlattSection):
         self.a4.connect([self.r4])
         self.a5.connect([self.r5])
         self.r6.connect([self.r6])
-        for item in [self.a1, self.an, self.a2, self.a3, self.a4, self.a5,
-                     self.a6]:
+        for item in [self.r1, self.r2, self.r3, self.r4, self.r5,
+                     self.r6, self.rnp, self.ab]:
             item.connect([self.output_mixer])
         self.output_mixer.connect([*self.outs])
 
@@ -449,6 +452,10 @@ class KlattParallel1980(KlattSection):
 class KlattRadiation1980(KlattSection):
     """
     Simulates the effect of radiation characteristic in the vocal tract.
+
+    TODO --- I think the output of the differentiator sounds kind of weird, too
+    buzzy, but I can't figure out for the life of me why... Need to keep
+    looking into it
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -644,8 +651,6 @@ class Switch(KlattComponent):
     def send(self):
         self.dests[0].receive(signal=self.output[0][:])
         self.dests[1].receive(signal=self.output[1][:])
-        self.input = np.zeros(self.mast.params["N_SAMP"])
-        self.output = np.zeros(self.mast.params["N_SAMP"])
 
     def operate(self, choice):
         for n in range(self.mast.params["N_SAMP"]):
@@ -654,5 +659,5 @@ class Switch(KlattComponent):
                 self.output[1][n] = 0
             elif choice[n] == 1:
                 self.output[0][n] = 0
-                self.output[1][1] = self.input[n]
+                self.output[1][n] = self.input[n]
         self.send()

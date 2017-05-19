@@ -82,7 +82,7 @@ class TVParam1980:
                        SW=0, FGP=0, BGP=100, FGZ=1500, BGZ=6000,
                        FNP=250, BNP=100, FNZ=250, BNZ=100, BGS=200,
                        A1=0, A2=0, A3=0, A4=0, A5=0, A6=0, AN=0,
-                       track_npoints=80):
+                       track_npoints=80, N_FORM=5):
         self.F0 = Track(np.ones(track_npoints)*F0)
         self.FF = [Track(np.ones(track_npoints)*FF[i]) for i in range(N_FORM)]
         self.BW = [Track(np.ones(track_npoints)*BW[i]) for i in range(N_FORM)]
@@ -136,8 +136,8 @@ def klatt_fake():
     """
     Temporary utility function to create set of parameters for testing.
     """
-    tvp = TVParameters()
-    ntvp = NTVParameters()
+    tvp = TVParam1980()
+    ntvp = NTVParam1980()
     return(tvp, ntvp)
 
 def klatt_make(tvparams=None, ntvparams=None):
@@ -149,7 +149,7 @@ def klatt_make(tvparams=None, ntvparams=None):
         ntvparams (NTVParam1980): non-time-varying parameters object
     """
     # Choose defaults if custom parameters not available
-    if tvparams is None
+    if tvparams is None:
         tvparams = TVParam1980()
     if ntvparams is None:
         ntvparams = NTVParam1980()
