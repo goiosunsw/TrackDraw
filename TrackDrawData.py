@@ -125,6 +125,7 @@ class Parameters:
                        track_bubble=False,
                        bubble_len=250,
                        threshold=0,
+                       standardf0=100,
                        standardff=[500, 1500, 2500, 3500, 4500]):
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
@@ -137,6 +138,7 @@ class Parameters:
         self.track_bubble = track_bubble
         self.bubble_len = bubble_len
         self.threshold = threshold
+        self.standardf0 = standardf0
         self.standardff = standardff
 
 # Depreciated below... need to fix!

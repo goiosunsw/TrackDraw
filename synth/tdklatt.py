@@ -36,7 +36,7 @@ Examples:
 try:
     import math
     import numpy as np
-    import sounddevice as sd
+    #import sounddevice as sd
 except ImportError:
     print("Missing one or more required modules.")
     print("Please make sure that math, numpy, and sounddevice are installed.")

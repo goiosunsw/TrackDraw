@@ -23,9 +23,12 @@ CURRENT_PARAMS = TDD.Parameters()
 LOADED_SOUND = TDD.Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
 SYNTH_SOUND = TDD.Sound(np.zeros([1]), DEFAULT_PARAMS.resample_fs, 1)
 NPOINTS = CURRENT_PARAMS.track_npoints
+F0_TRACK = [TDD.Track(DEFAULT_PARAMS.standardf0*np.ones([DEFAULT_PARAMS.track_npoints]))]
+TRACKS   = [TDD.Track(FF*np.ones([DEFAULT_PARAMS.track_npoints])) for
+            FF in DEFAULT_PARAMS.standardff]
 
-# Figure out how to incorporate F0 tracks and such
-# NEED TO ACCOUNT FOR TRACKS AND F0 AT LEAST
+# Create synthesizer
+SYNTH = synth.tdklatt.klatt_make()
 
 class Slots:
 
@@ -83,7 +86,7 @@ class Slots:
         # Reset params
         CURRENT_PARAMS = copy.deepcopy(DEFAULT_PARAMS)
         # Reset tracks
-        F0_TRACK =  [TDD.Track(F0*np.ones([DEFAULT_PARAMS.track_npoints]))]
+        F0_TRACK =  [TDD.Track(DEFAULT_PARAMS.F0*np.ones([DEFAULT_PARAMS.track_npoints]))]
         TRACKS   = [TDD.Track(FF*np.ones([DEFAULT_PARAMS.track_npoints])) for
                     FF in DEFAULT_PARAMS.standardff]
         self.master.cw.spec_cv.start(TRACKS)
@@ -366,21 +369,19 @@ class Slots:
         current synthesis parameters and updates SYNTH_SOUND.waveform
         accordingly. Then, if the synth radio button is checked, the changes
         to the waveform are reflected in the display.
-        """
-        CURRENT_PARAMS.F0 = F0_TRACK[0].points
-        CURRENT_PARAMS.FF = np.zeros([CURRENT_PARAMS.track_npoints,
-                                          CURRENT_PARAMS.nformant])
-        for i in range(CURRENT_PARAMS.nformant):
-            CURRENT_PARAMS.FF[:,i] = TRACKS[i].points
-        if LOADED_SOUND.dur < 0.05: # random catch-all value
-            CURRENT_PARAMS.dur = 1
-        else:
-            CURRENT_PARAMS.dur = LOADED_SOUND.dur
 
-        if CURRENT_PARAMS.synth_type == "Klatt 1980":
-            SYNTH_SOUND.waveform = synth.klatt.klatt_make(CURRENT_PARAMS)
-        elif CURRENT_PARAMS.synth_type == "Sine wave":
-            SYNTH_SOUND.waveform = synth.sine.sine_make(CURRENT_PARAMS)
+        TODO --- update this docstring, it's just plain wrong
+        """
+
+        SYNTH.params["F0"] = F0_TRACK[0].interpolate(SYNTH.params["N_SAMP"])
+        for i in range(CURRENT_PARAMS.nformant):
+            SYNTH.params["FF"][i] = \
+                TRACKS[i].interpolate(SYNTH.params["N_SAMP"])
+        # TODO --- add support for duration, requires change to tdklatt as
+        # indicated in task
+        # TODO --- add algorithm support and sine synthesis support
+        SYNTH.run()
+        SYNTH_SOUND = SYNTH.ouptut[:]
         if self.master.displayDock.synthedRadioButton.isChecked():
             self.master.cw.spec_cv.plot_specgram(x_right=SYNTH_SOUND.dur,
                                                  waveform=SYNTH_SOUND.waveform,
@@ -390,9 +391,9 @@ class Slots:
                                                  window_type=CURRENT_PARAMS.window_type,
                                                  tracks=TRACKS)
             self.master.cw.wave_cv.plot_waveform(SYNTH_SOUND.waveform)
-    ##### End synthesis slots #####    
-    
-    
+    ##### End synthesis slots #####
+
+
     ##### Track slots #####
     @pyqtSlot()
     def mouse(self, *arg, **kwarg):
