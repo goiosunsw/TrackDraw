@@ -1,17 +1,17 @@
 TrackDraw
 =========
-TrackDraw (version 0.1.0) is an open-source speech analysis and synthesis tool.
+TrackDraw (version 0.2.0) is an open-source speech analysis and synthesis tool.
 
 People
 ======
-TrackDraw was written by A.Y. Cho (M.S., pursuing Ph.D. at Harvard) and Daniel Guest (pursuing B.S. at UT Dallas).
-Email Daniel at daniel.guest@utdallas.edu with questions.
+TrackDraw was written by A.Y. Cho (M.S., pursuing Ph.D. at Harvard) and Daniel Guest (pursuing Ph.D. at Minnesota).
+Email Daniel at guest121@umn.edu with questions.
 
 History
 =======
 The original TrackDraw was a MATLAB package designed by Peter Assmann, Will Ballard, Laurie Bornstein, and Dwayne Paschall. This package allowed the user to draw tracks on a graphical user interface which served as the input for time-varying formant resonators in a Klatt synthesizer. It also supported drawing tracks over the spectrogram of an input speech waveform and sine-wave synthesis. More information about the original TrackDraw can be found here: http://www.utdallas.edu/~assmann/TRACKDRAW/about.html
 
-In the summer of 2016, efforts began to modernize the original TrackDraw and expand on its features. This code represents the first complete alpha build of the modernized TrackDraw in Python 3.
+In the summer of 2016, efforts began in the UT Dallas Speech Perception Lab to modernize the original TrackDraw and expand on its features. This repository contains the alpha build of the modernized TrackDraw in Python 3.
 
 Installation
 ============
@@ -51,19 +51,26 @@ Features already implemented:
 - Track-style input for formant frequencies over time
 - Loading input speech waveform
 
-Features to be added in next update (version 0.2.0, estimated release - winter 2016):
-- Variable thresholding on spectrogram
+Features to be added in next update (version 0.2.1, estimated release - October 2017):
 - Saving synthesized speech waveform to wav file
 - Saving settings and synthesis parameters to disk
-- Klatt 1988 synthesizer
-- Cython implementation of recursive filters
 
-Features to be added in next version change (version 1.0.0):
-- Automatic utterance copy (i.e. decomposing input waveform into synthesis parameters automatically)
+Features to be added in future:
+- Klatt 1988 synthesizer
+- C++ implementation of recursive filters
 - Help menu and tooltips
 - GUI control of every parameter in Klatt synthesizer
 - Batch processing
 - Wavelet analysis
 
 Long term planned features:
+- Automatic utterance copy (i.e. decomposing input waveform into synthesis parameters automatically)
 - Interfaces to allow access to TrackDraw functionality inside of the R and MATLAB programming environments
+
+Changelog
+=========
+
+0.2.0
+- Added variable spectrogram thresholding
+- Changed synthesis algorithm to feed-forward signal propagation and changed to using Numpy over lists (big speed increase)
+
