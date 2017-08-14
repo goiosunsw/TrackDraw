@@ -126,7 +126,8 @@ class Parameters:
                        bubble_len=250,
                        threshold=0,
                        standardf0=100,
-                       standardff=[500, 1500, 2500, 3500, 4500]):
+                       standardff=[500, 1500, 2500, 3500, 4500],
+                       stft_size=64):
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints
@@ -140,6 +141,13 @@ class Parameters:
         self.threshold = threshold
         self.standardf0 = standardf0
         self.standardff = standardff
+        self.stft_size = stft_size
+        # Below here is stop gap
+        self.AV = 0
+        self.AVS = 0
+        self.AH = 0
+        self.AF = 0
+        self.BW = [50, 50, 50, 50, 50]
 
 # Depreciated below... need to fix!
 

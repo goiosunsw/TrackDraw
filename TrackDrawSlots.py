@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import time
 import copy
-import sounddevice as sd
+#import sounddevice as sd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from scipy import signal
 from scipy.io import wavfile
@@ -381,7 +381,7 @@ class Slots:
         # indicated in task
         # TODO --- add algorithm support and sine synthesis support
         SYNTH.run()
-        SYNTH_SOUND = SYNTH.ouptut[:]
+        SYNTH_SOUND.waveform = SYNTH.output[:]
         if self.master.displayDock.synthedRadioButton.isChecked():
             self.master.cw.spec_cv.plot_specgram(x_right=SYNTH_SOUND.dur,
                                                  waveform=SYNTH_SOUND.waveform,

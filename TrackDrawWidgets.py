@@ -1,7 +1,7 @@
 #!TDS/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from TrackDrawData import DEFAULT_PARAMS
+from TrackDrawData import Parameters
 from functools import partial
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
@@ -12,6 +12,9 @@ matplotlib.use("QT5Agg")
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+
+DEFAULT_PARAMS = Parameters()
 
 
 class CanvasGrid(QWidget):

@@ -197,8 +197,8 @@ def main():
     mainWindow = MainWindow()
     mainWindow.show()
     # Have to start canvasses here, otherwise they're the wrong size!!
-    mainWindow.cw.spec_cv.start(TDD.TRACKS)
-    mainWindow.cw.f0_cv.start(TDD.F0_TRACK)
+    mainWindow.cw.spec_cv.start(TDS.TRACKS)
+    mainWindow.cw.f0_cv.start(TDS.F0_TRACK)
     mainWindow.cw.stft_cv.start()
     app.exec_()
 
