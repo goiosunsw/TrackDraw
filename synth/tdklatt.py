@@ -1,3 +1,194 @@
+"""
+tdklatt.py
+
+Provides a number of functions and classes which enable the user to synthesize
+speech waveforms ala Klatt 1980. Currently supports the Klatt 1980 algorithm at
+10 kHz sampling rate.
+
+Classes:
+    NTVParam1980: Non-time-varying parameters
+    TVParam1980: Time-varying parameters
+    KlattSynth: Top-level KlattSynth object.
+    KlattSection: Section-level synthesis object (e.g., voicing source or
+        filter cascade)
+    KlattComponent: Component-level synthesis object (e.g., filter or
+        amplifier)
+
+Functions:
+    klatt_make: Creates a KlattSynth object and properly initializes it using
+        NTVParam1980 and TVParam1980 objects
+
+Examples:
+    Create a synthesizer with default settings, run it, and hear the output.
+    >>> from tdklatt import *
+    >>> s = klatt_make()
+    >>> s.run()
+    >>> s.play()
+
+    Create a synthesizer, change the F0, and hear the output.
+    >>> from tdklatt import *
+    >>> s = klatt_make()
+    >>> s.params["F0"] = np.ones(s.params["N_SAMP"])*200 # Change F0 to 200 Hz
+    >>> s.run()
+    >>> s.play()
+"""
+
+try:
+    import math
+    import numpy as np
+    import sounddevice as sd
+except ImportError:
+    print("Missing one or more required modules.")
+    print("Please make sure that math, numpy, and sounddevice are installed.")
+    import sys
+    sys.exit()
+
+def klatt_make(tvparams=None, ntvparams=None):
+    """
+    Creates and prepares a KlattSynth object.
+
+    The user can provide a TVParams1980 object to the tvparams argument and a
+    NTVParam1980 object to the ntvparams argument, if they wish to initialize
+    those objects and modify parameter values first. If none are provided, then
+    defaults are initialized and used. First, the KlattSynth object is
+    initialized, and then each parameter passed to the KlattSynth object
+    (time-varying first, and then non-time-varying).
+
+    Arguments:
+        tvparams (TVParam1980): time-varying parameters object
+        ntvparams (NTVParam1980): non-time-varying parameters object
+
+    Returns:
+        synth (KlattSynth): Klatt synthesizer object, ready to run()
+    """
+    # Choose defaults if custom parameters not available
+    if ntvparams is None:
+        ntvparams = NTVParam1980()
+    if tvparams is None:
+        tvparams = TVParam1980(ntvparams=ntvparams)
+    # Initialize synth
+    synth = KlattSynth()
+
+    # Loop through all time-varying parameters, processing as needed
+    for param in list(filter(lambda aname: not aname.startswith("_"),
+                             dir(tvparams))):
+        if param is "FF" or param is "BW":
+            synth.params[param] = \
+                    [getattr(tvparams, param)[i] for i in range(ntvparams.N_FORM)]
+        else:
+            synth.params[param] = getattr(tvparams, param)
+    # Loop through all non-time-varying parameters and load
+    for param in list(filter(lambda aname: not aname.startswith("_"),
+                             dir(ntvparams))):
+        synth.params[param] = getattr(ntvparams,param)
+    synth.setup()
+    return(synth)
+
+
+class NTVParam1980(object):
+    """
+    Class container for non-time-varying parameters for Klatt 1980 synthesis.
+
+    Arguments:
+        FS (int): Sampling rate in Hz
+        N_FORM (int): Number of formants in vocal tract cascade simulation
+        DUR (float): Duration in seconds
+
+    Attributes:
+        FS (int): Sampling rate in Hz
+        N_FORM (int): Number of formants in vocal tract cascade simulation
+        DUR (float): Duration in seconds
+        N_SAMP (int): Number of samples to be synthesized
+        VER (string): Algorithm to be used in synthesis
+
+    Provides simple data storage and defaults for non-time-varying parameters
+    for KlattSynth's KLSYN80 algorithm.
+    """
+    def __init__(self, FS=10000,
+                       N_FORM=5,
+                       DUR=1):
+        self.FS = FS
+        self.DUR = DUR
+        self.N_FORM = N_FORM
+        self.N_SAMP = round(FS*DUR)
+        self.VER = "KLSYN80"
+
+
+class TVParam1980(object):
+    """
+    Class container for time-varying parameters for Klatt 1980 synthesis.
+
+    Arguments:
+        ntvparams (NTVParam1980): Non-time-varying parameters object, used to
+            determine the number of elements needed in the time-varying
+            parameter arrays
+        F0 (float): Fundamental frequency in Hz
+        FF (list): List of floats, each one corresponds to a formant frequency
+            in Hz
+        BW (list): List of floats, each one corresponds to the bandwidth of a
+            formant in Hz in terms of plus minus 3dB
+        AV (float): Amplitude of voicing in dB
+        AVS (float): Amplitude of quasi-sinusoidal voicing in dB
+        AH (float): Amplitude of aspiration in dB
+        AF (float): Amplitude of frication in dB
+        SW (0 or 1): Controls switch from voicing waveform generator to cascade
+            or parallel resonators
+        FGP (float): Frequency of the glottal resonator 1 in Hz
+        BGP (float): Bandwidth of glottal resonator 1 in Hz
+        FGZ (float): Frequency of glottal zero in Hz
+        BGZ (float): Bandwidth of glottal zero in Hz
+        FNP (float): Frequency of nasal pole in Hz
+        BNP (float): Bandwidth of nasal pole in Hz
+        FNZ (float): Frequency on the nasal zero in Hz
+        BNZ (float): Bandwidth of nasal zero in Hz
+        BGS (float): Glottal resonator 2 bandwidth in Hz
+        A1 (float): Amplitude of parallel formant 1 in Hz
+        A2 (float): Amplitude of parallel formant 2 in Hz
+        A3 (float): Amplitude of parallel formant 3 in Hz
+        A4 (float): Amplitude of parallel formant 4 in Hz
+        A5 (float): Amplitude of parallel formant 5 in Hz
+        A6 (float): Amplitude of parallel formant 6 in Hz
+        AN (float): Amplitude of nasal formant in dB
+
+    Attributes:
+        Each of the above time-varying parameters is stored as an attribute in
+            the form of a Numpy array.
+    """
+    def __init__(self, ntvparams, F0=100,
+                       FF=[500, 1500, 2500, 3500, 4500],
+                       BW=[50, 100, 100, 200, 250],
+                       AV=0, AVS=0, AH=0, AF=0,
+                       SW=0, FGP=0, BGP=100, FGZ=1500, BGZ=6000,
+                       FNP=250, BNP=100, FNZ=250, BNZ=100, BGS=200,
+                       A1=0, A2=0, A3=0, A4=0, A5=0, A6=0, AN=0,
+                       N_FORM=5):
+        N_SAMP = ntvparams.N_SAMP
+        self.F0 = np.ones(N_SAMP)*F0
+        self.FF = [np.ones(N_SAMP)*FF[i] for i in range(N_FORM)]
+        self.BW = [np.ones(N_SAMP)*BW[i] for i in range(N_FORM)]
+        self.AV = np.ones(N_SAMP)*AV
+        self.AVS = np.ones(N_SAMP)*AVS
+        self.AH = np.ones(N_SAMP)*AH
+        self.AF = np.ones(N_SAMP)*AF
+        self.FNZ = np.ones(N_SAMP)*FNZ
+        self.SW = np.ones(N_SAMP)*SW
+        self.FGP = np.ones(N_SAMP)*FGP
+        self.BGP = np.ones(N_SAMP)*BGP
+        self.FGZ = np.ones(N_SAMP)*FGZ
+        self.BGZ = np.ones(N_SAMP)*BGZ
+        self.FNP = np.ones(N_SAMP)*FNP
+        self.BNP = np.ones(N_SAMP)*BNP
+        self.BNZ = np.ones(N_SAMP)*BNZ
+        self.BGS = np.ones(N_SAMP)*BGS
+        self.A1 = np.ones(N_SAMP)*A1
+        self.A2 = np.ones(N_SAMP)*A2
+        self.A3 = np.ones(N_SAMP)*A3
+        self.A4 = np.ones(N_SAMP)*A4
+        self.A5 = np.ones(N_SAMP)*A5
+        self.A6 = np.ones(N_SAMP)*A6
+        self.AN = np.ones(N_SAMP)*AN
+
+
 class KlattSynth(object):
     """
     Synthesizes speech ala Klatt 1980 and Klatt 1990.
@@ -8,22 +199,26 @@ class KlattSynth(object):
             later
         sections (None): List of sections in the synthesizer, set by
             setup() later
-        param_list (list): List of valid parameter names
         params (dictionary): Dictionary of parameters, all entries are
-            initialized as None and must be set by external operations
+            initialized as None and are set later
+
+    Methods:
+        setup: Run after parameter values are set, initializes synthesizer
+        run: Clears current output vector and runs synthesizer
+        play: Plays output via sounddevice module
 
     KlattSynth contains all necessary synthesis parameters in an attribute
     called params. The synthesis routine is organized around the concept of
     sections and components. Sections are objects which represent organizational
     abstractions drawn from the Klatt 1980 paper. Each section is composed of
-    muiltiple components, which are small signal processing units like
+    multiple components, which are small signal processing units like
     individual filters, resonators, amplifiers, etc. Each section has a run()
     method with performs the operation that section is designed to do. For
     example, a KlattVoice section's run() method generates a voicing waveform.
 
     KlattSynth's params attribute will need to be provided with paramters, there
     are no built-in defaults! Currently the only way to do so is to generate a
-    KlattSynth object through the klatt_make function available in klattface.py
+    KlattSynth object through the klatt_make function available in interface.py
     or to do so manually. params is just a dictionary that can be directly
     addressed, so setting parameters is easy. One important caveat is that any
     time-varying parameters (i.e., all parameters except those labelled
@@ -36,6 +231,9 @@ class KlattSynth(object):
 
     Current supported synthesis routines:
         - Klatt 1980, "KLSYN80"
+            Klatt, D. H. (1980). Software for a cascade/parallel formant
+            synthesizer. The Journal of the Acoustical Society of America,
+            67 (3)
     """
     def __init__(self):
         """
@@ -44,14 +242,14 @@ class KlattSynth(object):
         Creates name and tag which can be used by TrackDraw to display current
         synthesis type. Also creates the parameter list, but leaves it blank.
         """
-        # Create tags
+        # Create name
         self.name = "Klatt Formant Synthesizer"
 
-        # Initialize empty attributes
+        # Create empty attributes
         self.output = None
         self.sections = None
 
-        # Initialize synthesis parameters dictionary
+        # Create synthesis parameters dictionary
         param_list = ["F0", "AV", "OQ", "SQ", "TL", "FL", # Source
                       "DI", "AVS", "AV", "AF", "AH",      # Source
                       "FF", "BW",                         # Formants
@@ -71,12 +269,12 @@ class KlattSynth(object):
         """
         Sets up KlattSynth.
 
-        Run after parameter values are set, initializes output vector, derives
+        Run after parameter values are set. Initializes output vector, derives
         necessary variables from input parameters, initializes sections and
         sets them to be attributes.
 
-        NOTE, it's probably bad practice to create new attributes outside of
-        __init__(), but...
+        NOTE: it's probably bad practice to create new attributes outside of
+        __init__(), but this is the approach for now...
         """
         # Initialize data vectors
         self.output = np.zeros(self.params["N_SAMP"])
@@ -120,6 +318,14 @@ class KlattSynth(object):
             section.run()
         self.output[:] = self.output_module.output[:]
 
+    def play(self):
+        """
+        Plays output waveform.
+
+        Uses sounddevice to play output waveform.
+        """
+        sd.play(data=self.output, samplerate=self.params["FS"])
+
 
 ##### CLASS DEFINITIONS #####
 class KlattSection:
@@ -127,22 +333,31 @@ class KlattSection:
     Parent class for section-level objects in TrackDraw synth system.
 
     Arguments:
-        mast (KlattSynth object): Master KlattSynth object, allows all
-            sub-components to access params
+        mast (KlattSynth): Master KlattSynth object, allows all
+            sub-components to access params directly
 
     Attributes:
-        mast (KlattSynth object): Master KlattSynth object, allows all
-            sub-components to access params
+        mast (KlattSynth): see Arguments
         ins (list): list of Buffer objects for handling this Section's
             inputs, if it has any
         outs (list): list of Buffer objects for handling this Section's
             outputs, if it has any
 
+    Methods:
+        connect: Used to connect two sections
+        process_ins: Processes all input buffers
+        process_outs: Processes all output buffers
+        run: Calls self.do(), which processes the signal by calling components'
+            methods as necessary
+
     An operational Section needs two custom methods to be implemented on top of
     the default methods provided by the class definition:
-        patch(), which describes how components should be connected, and
-        do(), which describes the order in which components should be run and
-            what parameters they should use during their operation
+        1) patch(), which describes how components should be connected, and
+        2) do(), which describes the order in which components should be run
+            and what parameters they should use during their operation
+
+    patch() is called by KlattSynth.setup(), while do() is called by this
+    class's generic run() method
     """
     def __init__(self, mast):
         self.mast = mast
@@ -172,7 +387,7 @@ class KlattSection:
         Processes all input buffers.
 
         Calls the Buffer's process() method for each Buffer in this section's
-        ins. Utility method for easy input processing.
+        ins.
         """
         for _in in self.ins:
             _in.process()
@@ -182,7 +397,7 @@ class KlattSection:
         Processes all output buffers.
 
         Calls the Buffer's process() method for each Buffer in this section's
-        outs. Utility method for easy output processing.
+        outs.
         """
         for out in self.outs:
             out.process()
@@ -212,12 +427,15 @@ class KlattComponent:
             for more information on how this list is used
 
     Attributes:
-        mast (KlattSynth): master KlattSynth object, allows for access to
-            params
-        dests (list): list of other Components, see send() method doc string
-            for more information on how this list is used
+        mast (KlattSynth): see Arguments
+        dests (list): see Arguments
         input (Numpy array): input vector, length N_SAMP
         output (Numpy array): output vector, length N_SAMP
+
+    Methods:
+        receive: Changes input vector
+        send: Propagates output to all destinations
+        connect: Used to connect two components together
 
     Components are small signal processing units (e.g., filters, amplifiers)
     which compose Sections. Components are connected at the Section level using
@@ -258,7 +476,7 @@ class KlattComponent:
         receive() method to set that Component's input to this Component's
         output, thereby propagating the signal through the chain of components.
 
-        NOTE - Mixer has a custom implementation of receive, but it interfaces
+        NOTE: Mixer has a custom implementation of receive, but it interfaces
         identically, so you don't need to worry about it.
         """
         for dest in self.dests:
@@ -282,6 +500,33 @@ class KlattComponent:
 class KlattVoice1980(KlattSection):
     """
     Generates a voicing waveform ala Klatt 1980.
+
+    Passes an impulse train with time-varying F0 through a series of filters
+    to generate both normal and quasi-sinusoidal voicing waveforms. Then,
+    amplifies and mixes the two waveforms. Passes the mixed output onward
+    through a time-varying binary switch.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        impulse (Impulse): Periodic pulse train generator with fundamental
+            frequency F0
+        rgp (Resonator): Glottal pole resonator to generate normal voicing
+            waveform with center frequency FGP and bandwidth BGP
+        rgz (Resonator): Glottal zero antiresonator with center frequency FGZ
+            bandwidth BGZ
+        rgs (Resonator): Secondary glottal resonator to generate
+            quasi-sinusoidal voicing waveform with center frequency FGP and
+            bandwidth BGS
+        av (Amplifier): Amplifier to control amplitude of normal voicing with
+            amplification amount AV
+        avs (Amplifier): Amplifier to control amplitude of quasi-sinuosidal
+            voicing with amplification amount AVS
+        mixer (Mixer): Mixer to mix normal voicing waveform and
+            quasi-sinusoidal voicing waveforms
+        switch (Switch): Switch to switch destination of KlattVoice1980 to
+            cascade filter track (SW=0) or parallel filter track with (SW=1)
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -305,7 +550,7 @@ class KlattVoice1980(KlattSection):
         self.switch.connect([*self.outs])
 
     def do(self):
-        self.impulse.impulse_gen()
+        self.impulse.impulse_gen(F0=self.mast.params["F0"])
         self.rgp.resonate(ff=self.mast.params["FGP"],
                           bw=self.mast.params["BGP"])
         self.rgz.resonate(ff=self.mast.params["FGZ"],
@@ -321,6 +566,16 @@ class KlattVoice1980(KlattSection):
 class KlattNoise1980(KlattSection):
     """
     Generates noise ala Klatt 1980.
+
+    Generates Gaussian noise which is then low-pass filtered and amplified.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        noisegen (Noisegen): Gaussian noise generator
+        lowpass (Lowpass): Simple time-domain lowpass filter
+        amp (Amplifier): Amplifier to control amplitude of lowpassed noise
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -336,12 +591,35 @@ class KlattNoise1980(KlattSection):
     def do(self):
         self.noisegen.generate()
         self.lowpass.filter()
-        self.amp.amplify(dB=-1000)
+        self.amp.amplify(dB=-1000) # Need to figure out a real value
 
 
 class KlattCascade1980(KlattSection):
     """
     Simulates a vocal tract with a cascade of resonators.
+
+    Passes noise waveform (ins[1]) through amplifier, and then mixes it with
+    voicing waveform (ins[0]). The mixed waveform is then passed through
+    resonators to simulate the nasal pole and zero and then through a cascade
+    of resonators to introduce formants 1-5 into the sound.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        ah (Amplifier): Amplifier to control amplitude of noise waveform with
+            amplification amount AH
+        mixer (Mixer): Mixer to mix voicing and noise waveforms
+        rnp (Resonator): Resonator to create nasal pole with center frequency
+            FNP and bandwidth BNP
+        rnz (Resonator): Antiresonator to create nasal zero with center
+            frequency FNZ and bandwdith BNZ
+        formants (list): List of Resonators to introduce formants into the
+            spectrum, contains N_FORM formants. Formant frequency values are
+            in the param FF, which is a list of arrays where the n-th array
+            contains the n-th formant frequency values. Bandwidth values are in
+            the param BW, which is a list of arrays where the n-th array
+            contains the n-th formant's bandwidth values.
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -379,6 +657,57 @@ class KlattCascade1980(KlattSection):
 class KlattParallel1980(KlattSection):
     """
     Simulates a vocal tract with a bank of parallel resonators.
+
+    Directs the noise waveform to an amplifier, and the voicing waveform to a
+    differentiator (highpass filter). Passes the high-passed voicing waveform
+    and amplified noise waveform to amplifier-resonator pairs which correspond
+    to the nasal formant and to formants 2-4. Passses the un-altered voicing
+    waveform to an amplifier-resonator pair which corresponds to formant 1.
+    Passes the amplified noise waveform to amplifier-resonator pairs which
+    correspond to formants 5-6 and to a bypass path. Mixes the output of all
+    the resonators and the bypass path.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        af (Amplifier): Amplifier to control the amplitude of the noise
+            waveform (ins[1]) with amplification amount AF
+        first_diff (Firstdiff): First differentiator (highpass filter)
+        mixer (Mixer): Mixer to mix amplified noise waveform and highpass
+            filtered voicing waveform
+        an (Amplifier): Amplifier to control the amplitude of the nasal formant
+            with amplification amount AN
+        rnp (Resonator): Resonator to create the nasal formant, with center
+            frequency FNP and bandwidth BNP
+        a1 (Amplifier): Amplifier to control the amplitude of the first formant
+            with amplification amount A1
+        r1 (Resonator): Resonator to create the first formant, with center
+            frequency and bandwidth in the 0-th array of FF and BW respectively
+        a2 (Amplifier): Amplifier to control the amplitude of the first formant
+            with amplification amount A2
+        r2 (Resonator): Resonator to create the second formant, with center
+            frequency and bandwidth in the 1-th array of FF and BW respectively
+        a3 (Amplifier): Amplifier to control the amplitude of the second formant
+            with amplification amount A3
+        r3 (Resonator): Resonator to create the third formant, with center
+            frequency and bandwidth in the 2-th array of FF and BW respectively
+        a4 (Amplifier): Amplifier to control the amplitude of the third formant
+            with amplification amount A4
+        r4 (Resonator): Resonator to create the fourth formant, with center
+            frequency and bandwidth in the 3-th array of FF and BW respectively
+        a5 (Amplifier): Amplifier to control the amplitude of the fifth formant
+            with amplification amount A5
+        r5 (Resonator): Resonator to create the fifth formant, with center
+            frequency and bandwidth in the 4-th array of FF and BW respectively
+        a6 (Amplifier): Amplifier to control the amplitude of the sixth formant
+            with amplification amount A6
+        r6 (Resonator): Resonator to create the sixth formant, with center
+            frequency and bandwidth in the 5-th array of FF and BW respectively
+        ab (Amplifier): Amplifier to control the amplitude of the bypass path
+            with amplification amount ?? (see comments below)
+        output_mixer (Mixer): Mixer to mix various formant waveforms and bypass
+            path output
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -453,9 +782,17 @@ class KlattRadiation1980(KlattSection):
     """
     Simulates the effect of radiation characteristic in the vocal tract.
 
-    TODO --- I think the output of the differentiator sounds kind of weird, too
-    buzzy, but I can't figure out for the life of me why... Need to keep
-    looking into it
+    Simply mixes inputs, and then highpass filters them (via calculating
+    the first derivative).
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        mixer (Mixer): Mixer to mix various inputs
+        firstdiff (Firstdiff): First differentiator to act as highpass filter
+            (in this case, models the effect of the radiation characteristic of
+            the lips)
     """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
@@ -474,6 +811,18 @@ class KlattRadiation1980(KlattSection):
 
 
 class OutputModule(KlattSection):
+    """
+    Mixes inputs and then normalizes mixed waveform by setting peak value of 1.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        mixer (Mixer): Mixer to mix various inputs
+        normalizer (Normalizer): Divides waveform by its absolute value maximum
+        output (np.array): Final destination for synthesized speech waveform,
+            extracted by KlattSynth object after synthesis is complete
+    """
     def __init__(self, mast):
         KlattSection.__init__(self, mast)
         self.mixer = Mixer(mast=self.mast)
@@ -495,12 +844,20 @@ class OutputModule(KlattSection):
 ##### COMPONENT DEFINITIONS #####
 class Buffer(KlattComponent):
     """
-    Utility component.
+    Utility component used in signal propagation.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+        dests (None): see parent class
     """
     def __init__(self, mast, dests=None):
         KlattComponent.__init__(self, mast, dests)
 
     def process(self):
+        """
+        Sets output to be the input waveform, and then sends output waveform to
+        downstream connected components.
+        """
         self.output[:] = self.input[:]
         self.send()
 
@@ -508,12 +865,36 @@ class Buffer(KlattComponent):
 class Resonator(KlattComponent):
     """
     Klatt resonator.
+
+    Recursive time-domain implementation of a resonator, matching Klatt's
+    specification.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+        anti (boolean): determines whether Resonator acts as resonator or
+            antiresonator (for more information, see Klatt 1980)
+
+    Attributes:
+        anti (boolean): See Arguments
     """
     def __init__(self, mast, anti=False):
         KlattComponent.__init__(self, mast)
         self.anti = anti
 
     def calc_coef(self, ff, bw):
+        """
+        Calculates filter coefficients.
+
+        Calculates filter coefficients to implement resonator ala Klatt 1980.
+        If self.anti = True, modifies the coefficients after calculation to
+        turn the resonator into an antiresonator. Accepts center frequency and
+        bandwidth values, and accesseds non-time-varying parameters from mast.
+
+        Arguments:
+            ff (array): Array of center frequency values in Hz, with length
+                N_SAMP
+            bw (array): Array of bandwidth values in Hz, with length N_SAMP
+        """
         c = -np.exp(-2*np.pi*bw*self.mast.params["DT"])
         b = (2*np.exp(-np.pi*bw*self.mast.params["DT"])\
              *np.cos(2*np.pi*ff*self.mast.params["DT"]))
@@ -527,6 +908,19 @@ class Resonator(KlattComponent):
             return(a, b, c)
 
     def resonate(self, ff, bw):
+        """
+        Processes input waveform with resonator filter.
+
+        Loops through values in the input array, calculating filter outputs
+        sample-by-sample in the time domain. Takes arrays to indicate center
+        frequency and bandwidth values, and passes them to calc_coef() to get
+        coefficients to be used in the filtering calculation.
+
+        Arguments:
+            ff (array): Array of center frequency values in Hz, with length
+                N_SAMP
+            bw (array): Array of bandwidth values in Hz, with length N_SAMP
+        """
         a, b, c = self.calc_coef(ff, bw)
         self.output[0] = a[0]*self.input[0]
         if self.anti:
@@ -545,14 +939,29 @@ class Resonator(KlattComponent):
 class Impulse(KlattComponent):
     """
     Time-varying impulse generator.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        last_glot_pulse (int): Number of samples since last glottal pulse
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
         self.last_glot_pulse = 0
 
-    def impulse_gen(self):
-        glot_period = np.round(self.mast.params["FS"]
-                            /self.mast.params["F0"])
+    def impulse_gen(self, F0):
+        """
+        Generates impulse train.
+
+        Starts with array of zeros with length N_SAMP. Loops through array,
+        setting value to 1 when the time since last glottal pulse is equal
+        to or exceeds the current glotal period (inverse of current F0).
+
+        Arguments:
+            F0 (arrry): Array of F0 values at each sample
+        """
+        glot_period = np.round(self.mast.params["FS"]/F0)
         for n in range(self.mast.params["N_SAMP"]):
             if n - self.last_glot_pulse >= glot_period[n]:
                 self.output[n] = 1
@@ -561,13 +970,35 @@ class Impulse(KlattComponent):
 
 
 class Mixer(KlattComponent):
+    """
+    Mixes waveforms together.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+    """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def receive(self, signal):
+        """
+        Mixes incoming waveform with current input.
+
+        Replaces KlattComponent's receive() method. Instead of setting input
+        equal to incoming waveform, mixes input with incoming waveform.
+
+        Arguments:
+            signal (array): waveform to be mixed with input
+        """
         self.input[:] = self.input[:] + signal[:]
 
     def mix(self):
+        """
+        Sets output to input.
+
+        The above receive() method really does the mixing --- this is just the
+        method called by the Mixer's KlattSection so that the signal
+        propagates.
+        """
         self.output[:] = self.input[:]
         self.send()
 
@@ -575,11 +1006,20 @@ class Mixer(KlattComponent):
 class Amplifier(KlattComponent):
     """
     Simple amplifier, scales amplitude of signal by dB value.
+
+    Arguments:
+        mast (KlattSynth): see parent class
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def amplify(self, dB):
+        """
+        Peforms amplification.
+
+        Arguments:
+            dB (float): amount of amplification to occur in dB
+        """
         dB = np.sqrt(10)**(dB/10)
         self.output[:] = self.input[:]*dB
         self.send()
@@ -588,12 +1028,18 @@ class Amplifier(KlattComponent):
 class Firstdiff(KlattComponent):
     """
     Simple first difference operator.
+
+    Arguments:
+        mast (KlattSynth): see parent class
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def differentiate(self):
-        self.output[0] = self.input[0]
+        """
+        Peforms first difference operation.
+        """
+        self.output[0] = 0
         for n in range(1, self.mast.params["N_SAMP"]):
             self.output[n] = self.input[n] - self.input[n-1]
         self.send()
@@ -602,11 +1048,17 @@ class Firstdiff(KlattComponent):
 class Lowpass(KlattComponent):
     """
     Simple one-zero 6 dB/oct lowpass filter.
+
+    Arguments:
+        mast (KlattSynth): see parent class
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def filter(self):
+        """
+        Implements lowpass filter operation.
+        """
         self.output[0] = self.input[0]
         for n in range(1, self.mast.params["N_SAMP"]):
             self.output[n] = self.input[n] + self.output[n-1]
@@ -616,11 +1068,17 @@ class Lowpass(KlattComponent):
 class Normalizer(KlattComponent):
     """
     Normalizes signal so that abs(max value) is 1.
+
+    Arguments:
+        mast (KlattSynth): see parent class
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def normalize(self):
+        """
+        Implements normalization.
+        """
         self.output[:] = self.input[:]/np.max(np.abs(self.input[:]))
         self.send()
 
@@ -628,11 +1086,17 @@ class Normalizer(KlattComponent):
 class Noisegen(KlattComponent):
     """
     Generates noise from a Gaussian distribution.
+
+    Arguments:
+        mast (KlattSynth): see parent class
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
 
     def generate(self):
+        """
+        Generates Gaussian noise with mean 0, sd 1.0, and length N_SAMP
+        """
         self.output[:] = np.random.normal(loc=0.0, scale=1.0,
                                           size=self.mast.params["N_SAMP"])
         self.send()
@@ -641,6 +1105,17 @@ class Noisegen(KlattComponent):
 class Switch(KlattComponent):
     """
     Binary switch between two outputs.
+
+    Has two output signals (instead of one, as in other KlattComponents). Each
+    is connected to a different destination, and the operate() function
+    switches the input between the two possible outputs depending on a control
+    singal.
+
+    Arguments:
+        mast (KlattSynth): see parent class
+
+    Attributes:
+        output (list): List of two np.arrays as described above
     """
     def __init__(self, mast):
         KlattComponent.__init__(self, mast)
@@ -649,10 +1124,26 @@ class Switch(KlattComponent):
         self.output.append(np.zeros(self.mast.params["N_SAMP"]))
 
     def send(self):
+        """
+        Perpetuates signal to components further down in the chain.
+
+        Replaces KlattComponent's send() method, sending one output to one
+        destination and the other output to another destination.
+        """
         self.dests[0].receive(signal=self.output[0][:])
         self.dests[1].receive(signal=self.output[1][:])
 
     def operate(self, choice):
+        """
+        Implements binary switching.
+
+        Arguments:
+            choice (np.array): Array of zeros and ones which tell the Switch
+                where to send the input singal. For samples where switch=0 the
+                signal is sent to the first output and the second output is set
+                to zero. For samples where switch=1 the signal is sent to the
+                second output and the first output is set to zero.
+        """
         for n in range(self.mast.params["N_SAMP"]):
             if choice[n] == 0:
                 self.output[0][n] = self.input[n]
