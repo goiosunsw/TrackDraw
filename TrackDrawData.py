@@ -89,7 +89,10 @@ class Track:
         xvals = np.linspace(0, 1, out_len)
         return(np.interp(xvals, x, self.points))
 
-class TrackDrawParameters:
+    def __len__(self):
+        return(len(self.points))
+
+class Parameters:
     """
     Simple container class for TrackDraw parameters.
 
@@ -121,7 +124,8 @@ class TrackDrawParameters:
                        nformant=5,
                        track_bubble=False,
                        bubble_len=250,
-                       threshold=0):
+                       threshold=0,
+                       standardff=[500, 1500, 2500, 3500, 4500]):
         self.resample_fs = resample_fs
         self.synth_fs = synth_fs
         self.track_npoints = track_npoints
@@ -133,6 +137,7 @@ class TrackDrawParameters:
         self.track_bubble = track_bubble
         self.bubble_len = bubble_len
         self.threshold = threshold
+        self.standardff = standardff
 
 # Depreciated below... need to fix!
 
