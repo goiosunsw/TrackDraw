@@ -6,7 +6,6 @@ date:    08/14/2017
 version: 0.2.0
 """
 
-
 import numpy as np
 import matplotlib.mlab as mlab
 
@@ -91,6 +90,7 @@ class Track:
 
     def __len__(self):
         return(len(self.points))
+
 
 class Parameters:
     """

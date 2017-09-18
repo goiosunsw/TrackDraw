@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import time
 import copy
-#import sounddevice as sd
+import sounddevice as sd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from scipy import signal
 from scipy.io import wavfile
