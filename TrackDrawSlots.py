@@ -380,6 +380,8 @@ class Slots:
         # TODO --- add support for duration, requires change to tdklatt as
         # indicated in task
         # TODO --- add algorithm support and sine synthesis support
+        print(F0_TRACK)
+        print(SYNTH.params["F0"])
         SYNTH.run()
         SYNTH_SOUND.waveform = SYNTH.output[:]
         if self.master.displayDock.synthedRadioButton.isChecked():
