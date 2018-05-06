@@ -1,6 +1,6 @@
 TrackDraw
 =========
-TrackDraw (version 0.2.0) is an open-source speech analysis and synthesis tool. TrackDraw is not actievly being developed, but I'll get back to it when I have some free time! 
+TrackDraw (version 0.2.0) is an open-source speech analysis and synthesis tool. TrackDraw is not actively being developed, but I'll get back to it when I have some free time! 
 
 People
 ======
