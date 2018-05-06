@@ -1,6 +1,6 @@
 TrackDraw
 =========
-TrackDraw (version 0.1.0) is an open-source speech analysis and synthesis tool.
+TrackDraw (version 0.1.0) is an open-source speech analysis and synthesis tool. 
 
 People
 ======
@@ -51,19 +51,4 @@ Features already implemented:
 - Track-style input for formant frequencies over time
 - Loading input speech waveform
 
-Features to be added in next update (version 0.2.0, estimated release - winter 2016):
-- Variable thresholding on spectrogram
-- Saving synthesized speech waveform to wav file
-- Saving settings and synthesis parameters to disk
-- Klatt 1988 synthesizer
-- Cython implementation of recursive filters
-
-Features to be added in next version change (version 1.0.0):
-- Automatic utterance copy (i.e. decomposing input waveform into synthesis parameters automatically)
-- Help menu and tooltips
-- GUI control of every parameter in Klatt synthesizer
-- Batch processing
-- Wavelet analysis
-
-Long term planned features:
-- Interfaces to allow access to TrackDraw functionality inside of the R and MATLAB programming environments
+Currently I'm working to update TrackDraw's speech synthesis algorithm to be better and easier to use, and then I'll be integrating it with TrackDraw. 
